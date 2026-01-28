@@ -21,7 +21,7 @@ email-validator==2.1.0
 
 # AI Services
 openai==1.10.0
-dashscope==1.14.1
+dashscope==1.23.9
 
 # Utilities
 python-dotenv==1.0.0

@@ -1,20 +1,19 @@
-//
-//  SceneLingApp.swift
-//  SceneLing
-//
-//  Created by 知遇 on 2026/1/28.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
 struct SceneLingApp: App {
+    @StateObject private var authManager = AuthManager()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            LocalScene.self,
+            LocalNote.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false
+        )
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -26,6 +25,7 @@ struct SceneLingApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(authManager)
         }
         .modelContainer(sharedModelContainer)
     }

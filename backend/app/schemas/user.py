@@ -31,5 +31,5 @@ class UserResponse(BaseModel):
 
 class UserStats(BaseModel):
     total_scenes: int
-    total_words: int
+    total_dialogues: int
     learning_days: int

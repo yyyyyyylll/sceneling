@@ -15,7 +15,6 @@ router = APIRouter()
 
 @router.post("/analyze", response_model=SceneAnalyzeResponse)
 async def analyze_scene(
-    current_user: CurrentUser,
     image: UploadFile = File(...),
     cefr_level: Optional[str] = "B1"
 ):

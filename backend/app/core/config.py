@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Qwen VL (通义千问多模态)
     DASHSCOPE_API_KEY: str = ""
 
+    # Qwen TTS (通义千问语音合成)
+    QWEN_TTS_MODEL: str = "qwen3-tts-flash-realtime"
+    QWEN_TTS_WS_URL: str = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+
     # Aliyun TTS
     ALIYUN_ACCESS_KEY_ID: str = ""
     ALIYUN_ACCESS_KEY_SECRET: str = ""

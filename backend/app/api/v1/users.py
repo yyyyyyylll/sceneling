@@ -3,7 +3,6 @@ from sqlalchemy import select, func
 
 from app.api.deps import DBSession, CurrentUser
 from app.models.scene import Scene
-from app.models.note import Note, NoteType
 from app.schemas.user import UserResponse, UserStats
 
 router = APIRouter()
@@ -18,20 +17,18 @@ async def get_profile(current_user: CurrentUser):
 @router.get("/stats", response_model=UserStats)
 async def get_stats(current_user: CurrentUser, db: DBSession):
     """获取用户学习统计"""
-    # 场景数
+    # 获取所有场景
     scenes_result = await db.execute(
-        select(func.count(Scene.id)).where(Scene.user_id == current_user.id)
+        select(Scene).where(Scene.user_id == current_user.id)
     )
-    total_scenes = scenes_result.scalar() or 0
+    scenes = scenes_result.scalars().all()
+    total_scenes = len(scenes)
 
-    # 词汇数
-    words_result = await db.execute(
-        select(func.count(Note.id)).where(
-            Note.user_id == current_user.id,
-            Note.type == NoteType.VOCABULARY
-        )
+    # 对话数（统计所有场景中的角色数）
+    total_dialogues = sum(
+        len(scene.expressions.get("roles", [])) if scene.expressions else 0
+        for scene in scenes
     )
-    total_words = words_result.scalar() or 0
 
     # 学习天数（简化计算：按创建日期算）
     days_result = await db.execute(
@@ -43,6 +40,6 @@ async def get_stats(current_user: CurrentUser, db: DBSession):
 
     return UserStats(
         total_scenes=total_scenes,
-        total_words=total_words,
+        total_dialogues=total_dialogues,
         learning_days=learning_days
     )
