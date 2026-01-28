@@ -325,20 +325,16 @@ struct VocabularyItem: View {
     private func speak(text: String) {
         guard !text.isEmpty else { return }
         isSpeaking = true
-        Task {
-            defer { isSpeaking = false }
-            do {
-                let url = try await APIService.shared.textToSpeech(text: text)
-                audioPlayer.enqueue(url: url)
-            } catch {
-                print("TTS failed: \(error)")
-            }
+        LocalSpeechSynthesizer.shared.speak(text)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            isSpeaking = false
         }
     }
 }
 
 struct DescriptionCard: View {
     let description: Description
+    @State private var isSpeaking = false
 
     var body: some View {
         ScrollView {
@@ -350,11 +346,12 @@ struct DescriptionCard: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
-                            // TODO: 播放发音
+                            speak(text: description.en)
                         } label: {
                             Image(systemName: "speaker.wave.2")
                                 .foregroundStyle(.blue)
                         }
+                        .disabled(isSpeaking)
                     }
                     Text(description.en)
                         .font(.body)
@@ -376,6 +373,15 @@ struct DescriptionCard: View {
             }
             .padding()
             .padding(.bottom, 20)
+        }
+    }
+
+    private func speak(text: String) {
+        guard !text.isEmpty else { return }
+        isSpeaking = true
+        LocalSpeechSynthesizer.shared.speak(text)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isSpeaking = false
         }
     }
 }
@@ -480,14 +486,9 @@ struct SentenceItem: View {
     private func speak(text: String) {
         guard !text.isEmpty else { return }
         isSpeaking = true
-        Task {
-            defer { isSpeaking = false }
-            do {
-                let url = try await APIService.shared.textToSpeech(text: text)
-                audioPlayer.enqueue(url: url)
-            } catch {
-                print("TTS failed: \(error)")
-            }
+        LocalSpeechSynthesizer.shared.speak(text)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            isSpeaking = false
         }
     }
 }

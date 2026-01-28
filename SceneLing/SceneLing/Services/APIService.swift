@@ -134,6 +134,12 @@ class APIService {
         return url
     }
 
+    func textToSpeechDataURL(text: String, voice: String = "en-US-female") async throws -> String {
+        let request = TTSRequest(text: text, voice: voice)
+        let response: TTSResponse = try await post("/tts", body: request)
+        return response.audioUrl
+    }
+
     // MARK: - User
 
     func getUserStats() async throws -> UserStats {
