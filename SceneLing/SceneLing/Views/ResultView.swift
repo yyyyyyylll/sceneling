@@ -13,7 +13,10 @@ struct ResultView: View {
     @State private var selectedTab = 0
     @State private var isSaving = false
     @State private var showSaveSuccess = false
+    @State private var showRoleSelection = false
     @State private var showChat = false
+    @State private var selectedUserRole: Role?
+    @State private var selectedAIRole: Role?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -149,7 +152,7 @@ struct ResultView: View {
 
                 // AI Chat Button
                 Button {
-                    showChat = true
+                    showRoleSelection = true
                 } label: {
                     HStack {
                         Image(systemName: "bubble.left.and.bubble.right")
@@ -164,9 +167,20 @@ struct ResultView: View {
             }
             .padding()
         }
-        .sheet(isPresented: $showChat) {
+        .sheet(isPresented: $showRoleSelection) {
             if let result = analyzeResult {
-                ChatView(sceneContext: result)
+                RoleSelectionView(roles: result.expressions.roles) { userRole, aiRole in
+                    selectedUserRole = userRole
+                    selectedAIRole = aiRole
+                    showChat = true
+                }
+            }
+        }
+        .sheet(isPresented: $showChat) {
+            if let result = analyzeResult,
+               let userRole = selectedUserRole,
+               let aiRole = selectedAIRole {
+                ChatView(sceneContext: result, userRole: userRole, aiRole: aiRole)
             }
         }
     }

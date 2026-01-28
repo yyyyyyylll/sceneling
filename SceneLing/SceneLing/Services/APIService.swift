@@ -145,6 +145,8 @@ class APIService {
     func chat(
         message: String,
         sceneContext: SceneAnalyzeResponse,
+        userRole: Role,
+        aiRole: Role,
         history: [(String, Bool)]
     ) async throws -> String {
         let request = ChatRequest(
@@ -153,6 +155,8 @@ class APIService {
             sceneTagCn: sceneContext.sceneTagCn,
             category: sceneContext.category,
             roles: sceneContext.expressions.roles.map { "\($0.roleEn) (\($0.roleCn))" },
+            userRole: "\(userRole.roleEn) (\(userRole.roleCn))",
+            aiRole: "\(aiRole.roleEn) (\(aiRole.roleCn))",
             history: history.map { ChatMessage(content: $0.0, isUser: $0.1) }
         )
         let response: ChatResponse = try await post("/chat", body: request)
@@ -162,6 +166,8 @@ class APIService {
     func chatStream(
         message: String,
         sceneContext: SceneAnalyzeResponse,
+        userRole: Role,
+        aiRole: Role,
         history: [(String, Bool)],
         onEvent: @escaping (SSEEvent) -> Void,
         onComplete: @escaping () -> Void
@@ -172,6 +178,8 @@ class APIService {
             sceneTagCn: sceneContext.sceneTagCn,
             category: sceneContext.category,
             roles: sceneContext.expressions.roles.map { "\($0.roleEn) (\($0.roleCn))" },
+            userRole: "\(userRole.roleEn) (\(userRole.roleCn))",
+            aiRole: "\(aiRole.roleEn) (\(aiRole.roleCn))",
             history: history.map { ChatMessage(content: $0.0, isUser: $0.1) }
         )
 

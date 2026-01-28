@@ -21,6 +21,8 @@ class ChatRequest(BaseModel):
     scene_tag_cn: str
     category: str
     roles: List[str]
+    user_role: str
+    ai_role: str
     history: Optional[List[ChatMessage]] = []
 
 
@@ -42,6 +44,8 @@ async def chat(request: ChatRequest):
         scene_tag_cn=request.scene_tag_cn,
         category=request.category,
         roles=request.roles,
+        user_role=request.user_role,
+        ai_role=request.ai_role,
         history=history
     )
 
@@ -73,6 +77,8 @@ async def chat_stream(request: ChatRequest):
                 scene_tag_cn=request.scene_tag_cn,
                 category=request.category,
                 roles=request.roles,
+                user_role=request.user_role,
+                ai_role=request.ai_role,
                 history=history
             ):
                 if event_type == "final":

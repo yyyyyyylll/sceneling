@@ -159,6 +159,8 @@ struct ChatRequest: Codable {
     let sceneTagCn: String
     let category: String
     let roles: [String]
+    let userRole: String
+    let aiRole: String
     let history: [ChatMessage]
 
     enum CodingKeys: String, CodingKey {
@@ -167,6 +169,8 @@ struct ChatRequest: Codable {
         case sceneTagCn = "scene_tag_cn"
         case category
         case roles
+        case userRole = "user_role"
+        case aiRole = "ai_role"
         case history
     }
 }

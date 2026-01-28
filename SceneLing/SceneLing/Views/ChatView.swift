@@ -19,6 +19,8 @@ class LocalChatMessage: Identifiable, ObservableObject {
 
 struct ChatView: View {
     let sceneContext: SceneAnalyzeResponse
+    let userRole: Role
+    let aiRole: Role
     @Environment(\.dismiss) private var dismiss
 
     @State private var messages: [LocalChatMessage] = []
@@ -101,12 +103,20 @@ struct ChatView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(sceneContext.category)
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(.systemGray5))
-                .clipShape(Capsule())
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("我：\(userRole.roleCn)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("AI：\(aiRole.roleCn)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(sceneContext.category)
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGray5))
+                    .clipShape(Capsule())
+            }
         }
         .padding()
         .background(Color(.systemGray6))
@@ -175,11 +185,7 @@ struct ChatView: View {
     }
 
     private func generateGreeting() -> String {
-        // Generate a greeting based on scene roles
-        if let firstRole = sceneContext.expressions.roles.first {
-            return "你好！我是这个场景中的 \(firstRole.roleCn)。基于「\(sceneContext.sceneTagCn)」这个场景，让我们来练习对话吧！你可以用英文或中文跟我交流。"
-        }
-        return "你好！基于「\(sceneContext.sceneTagCn)」这个场景，让我们来练习对话吧！你可以用英文或中文跟我交流。"
+        return "已选择角色：你是\(userRole.roleCn)，AI是\(aiRole.roleCn)。开始对话吧！"
     }
 
     private func sendMessage() {
@@ -201,6 +207,8 @@ struct ChatView: View {
         sseClient = APIService.shared.chatStream(
             message: userMessage,
             sceneContext: sceneContext,
+            userRole: userRole,
+            aiRole: aiRole,
             history: Array(history),
             onEvent: { [weak aiMessage] event in
                 switch event {
@@ -285,5 +293,6 @@ struct TypingIndicator: View {
             Role(roleEn: "Barista", roleCn: "咖啡师", sentences: [])
         ]),
         category: "餐饮"
-    ))
+    ), userRole: Role(roleEn: "Customer", roleCn: "顾客", sentences: []),
+       aiRole: Role(roleEn: "Barista", roleCn: "咖啡师", sentences: []))
 }

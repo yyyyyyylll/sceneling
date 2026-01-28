@@ -5,7 +5,10 @@ struct SceneDetailView: View {
     let scene: LocalScene
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab = 0
+    @State private var showRoleSelection = false
     @State private var showChat = false
+    @State private var selectedUserRole: Role?
+    @State private var selectedAIRole: Role?
 
     // 从 LocalScene 转换为 SceneAnalyzeResponse 用于 ChatView
     private var sceneContext: SceneAnalyzeResponse {
@@ -97,7 +100,7 @@ struct SceneDetailView: View {
 
                 // AI对话按钮
                 Button {
-                    showChat = true
+                    showRoleSelection = true
                 } label: {
                     HStack {
                         Image(systemName: "bubble.left.and.bubble.right")
@@ -121,8 +124,17 @@ struct SceneDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showRoleSelection) {
+            RoleSelectionView(roles: scene.expressions.roles) { userRole, aiRole in
+                selectedUserRole = userRole
+                selectedAIRole = aiRole
+                showChat = true
+            }
+        }
         .sheet(isPresented: $showChat) {
-            ChatView(sceneContext: sceneContext)
+            if let userRole = selectedUserRole, let aiRole = selectedAIRole {
+                ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole)
+            }
         }
     }
 }

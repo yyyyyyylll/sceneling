@@ -11,6 +11,8 @@ CHAT_SYSTEM_PROMPT = """You are a friendly English learning assistant helping th
 - Scene: {scene_tag} ({scene_tag_cn})
 - Category: {category}
 - Possible roles: {roles}
+- User role: {user_role}
+- Your role (AI): {ai_role}
 
 ## Your Tasks
 1. Role-play as one character in the scene and chat with the user
@@ -32,6 +34,8 @@ async def chat_with_scene(
     scene_tag_cn: str,
     category: str,
     roles: List[str],
+    user_role: str,
+    ai_role: str,
     history: List[Dict[str, str]]
 ) -> str:
     """
@@ -44,7 +48,9 @@ async def chat_with_scene(
         scene_tag=scene_tag,
         scene_tag_cn=scene_tag_cn,
         category=category,
-        roles=", ".join(roles)
+        roles=", ".join(roles),
+        user_role=user_role,
+        ai_role=ai_role
     )
 
     # 构建消息历史
@@ -89,6 +95,8 @@ async def chat_with_scene_stream(
     scene_tag_cn: str,
     category: str,
     roles: List[str],
+    user_role: str,
+    ai_role: str,
     history: List[Dict[str, str]]
 ) -> AsyncGenerator[Tuple[str, str], None]:
     """
@@ -107,7 +115,9 @@ async def chat_with_scene_stream(
         scene_tag=scene_tag,
         scene_tag_cn=scene_tag_cn,
         category=category,
-        roles=", ".join(roles)
+        roles=", ".join(roles),
+        user_role=user_role,
+        ai_role=ai_role
     )
 
     messages = [{"role": "system", "content": system_prompt}]
