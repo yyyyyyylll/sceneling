@@ -55,6 +55,10 @@ class APIService {
         return try await post("/auth/apple", body: request)
     }
 
+    func getMe() async throws -> UserBrief {
+        return try await get("/auth/me")
+    }
+
     // MARK: - Scenes
 
     func analyzeImage(_ imageData: Data, cefrLevel: String = "B1") async throws -> SceneAnalyzeResponse {

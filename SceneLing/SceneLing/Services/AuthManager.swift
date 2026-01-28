@@ -14,7 +14,9 @@ class AuthManager: ObservableObject {
         // 检查本地存储的 token
         if let _ = UserDefaults.standard.string(forKey: tokenKey) {
             isLoggedIn = true
-            // TODO: 验证 token 有效性，获取用户信息
+            Task {
+                await validateToken()
+            }
         }
     }
 
@@ -65,6 +67,23 @@ class AuthManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: tokenKey)
         currentUser = nil
         isLoggedIn = false
+    }
+
+    @MainActor
+    func validateToken() async {
+        guard UserDefaults.standard.string(forKey: tokenKey) != nil else { return }
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let user = try await APIService.shared.getMe()
+            currentUser = user
+            isLoggedIn = true
+        } catch {
+            logout()
+        }
+
+        isLoading = false
     }
 
     /// 演示模式登录（仅用于开发测试）

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from jose import jwt
 from sqlalchemy import select
 
-from app.api.deps import DBSession
+from app.api.deps import DBSession, CurrentUser
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.auth import AppleAuthRequest, TokenResponse, UserBrief
@@ -59,4 +59,15 @@ async def apple_login(request: AppleAuthRequest, db: DBSession):
             avatar_url=user.avatar_url,
             is_new_user=is_new_user
         )
+    )
+
+
+@router.get("/me", response_model=UserBrief)
+async def get_me(current_user: CurrentUser):
+    """获取当前用户信息"""
+    return UserBrief(
+        id=str(current_user.id),
+        nickname=current_user.nickname,
+        avatar_url=current_user.avatar_url,
+        is_new_user=False
     )
