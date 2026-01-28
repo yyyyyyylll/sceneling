@@ -9,6 +9,7 @@ struct SceneDetailView: View {
     @State private var showChat = false
     @State private var selectedUserRole: Role?
     @State private var selectedAIRole: Role?
+    @State private var showSaveSuccess = false
 
     // 从 LocalScene 转换为 SceneAnalyzeResponse 用于 ChatView
     private var sceneContext: SceneAnalyzeResponse {
@@ -66,14 +67,14 @@ struct SceneDetailView: View {
 
                     // Content
                     TabView(selection: $selectedTab) {
-                        VocabularyCard(objectTags: scene.objectTags)
+                        VocabularyCard(objectTags: scene.objectTags, sceneId: scene.id)
                             .tag(0)
                         DescriptionCard(description: Description(
                             en: scene.descriptionEn,
                             cn: scene.descriptionCn
                         ))
                             .tag(1)
-                        ExpressionCard(expressions: scene.expressions)
+                        ExpressionCard(expressions: scene.expressions, sceneId: scene.id)
                             .tag(2)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
@@ -85,11 +86,11 @@ struct SceneDetailView: View {
             HStack(spacing: 12) {
                 // 保存按钮（已保存状态）
                 Button {
-                    dismiss()
+                    showSaveSuccess = true
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle")
-                        Text("保存")
+                        Text("保存到场景库")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -135,6 +136,9 @@ struct SceneDetailView: View {
             if let userRole = selectedUserRole, let aiRole = selectedAIRole {
                 ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole)
             }
+        }
+        .alert("已保存到场景库", isPresented: $showSaveSuccess) {
+            Button("好的") {}
         }
     }
 }

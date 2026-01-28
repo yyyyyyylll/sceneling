@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser
 from app.services.aliyun_tts import text_to_speech
 
 router = APIRouter()
@@ -18,8 +17,7 @@ class TTSResponse(BaseModel):
 
 @router.post("", response_model=TTSResponse)
 async def synthesize_speech(
-    request: TTSRequest,
-    current_user: CurrentUser
+    request: TTSRequest
 ):
     """文本转语音"""
     if not request.text or len(request.text) > 1000:

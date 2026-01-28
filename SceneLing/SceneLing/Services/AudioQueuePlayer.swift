@@ -25,14 +25,14 @@ class AudioQueuePlayer: ObservableObject {
     }
 
     func enqueue(dataURL: String) {
-        guard let audioData = decodeDataURL(dataURL) else {
+        guard let (audioData, fileExtension) = decodeDataURL(dataURL) else {
             print("Failed to decode data URL")
             return
         }
 
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("mp3")
+            .appendingPathExtension(fileExtension)
 
         do {
             try audioData.write(to: tempURL)
@@ -106,13 +106,27 @@ class AudioQueuePlayer: ObservableObject {
         }
     }
 
-    private func decodeDataURL(_ dataURL: String) -> Data? {
+    private func decodeDataURL(_ dataURL: String) -> (Data, String)? {
         guard dataURL.hasPrefix("data:") else { return nil }
 
         let parts = dataURL.components(separatedBy: ",")
         guard parts.count == 2 else { return nil }
+        let header = parts[0]
+        let base64 = parts[1]
 
-        return Data(base64Encoded: parts[1])
+        let fileExtension: String
+        if header.contains("audio/wav") {
+            fileExtension = "wav"
+        } else if header.contains("audio/mp3") || header.contains("audio/mpeg") {
+            fileExtension = "mp3"
+        } else if header.contains("audio/opus") {
+            fileExtension = "opus"
+        } else {
+            fileExtension = "dat"
+        }
+
+        guard let data = Data(base64Encoded: base64) else { return nil }
+        return (data, fileExtension)
     }
 
     deinit {

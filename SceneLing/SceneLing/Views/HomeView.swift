@@ -98,7 +98,12 @@ struct HomeView: View {
                 GridItem(.flexible())
             ], spacing: 12) {
                 ForEach(recentScenes.prefix(4)) { scene in
-                    SceneCard(scene: scene)
+                    NavigationLink {
+                        SceneDetailView(scene: scene)
+                    } label: {
+                        SceneCard(scene: scene)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
