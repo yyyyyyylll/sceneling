@@ -16,6 +16,7 @@ final class LocalScene {
     var category: String
     var createdAt: Date
     var isSynced: Bool
+    var dialogueCount: Int  // 对话次数
 
     init(
         id: UUID = UUID(),
@@ -30,7 +31,8 @@ final class LocalScene {
         expressions: Expressions,
         category: String,
         createdAt: Date = Date(),
-        isSynced: Bool = false
+        isSynced: Bool = false,
+        dialogueCount: Int = 0
     ) {
         self.id = id
         self.serverId = serverId
@@ -45,6 +47,12 @@ final class LocalScene {
         self.category = category
         self.createdAt = createdAt
         self.isSynced = isSynced
+        self.dialogueCount = dialogueCount
+    }
+
+    /// 增加对话次数
+    func incrementDialogueCount() {
+        dialogueCount += 1
     }
 }
 

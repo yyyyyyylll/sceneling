@@ -3,6 +3,18 @@ import SwiftUI
 struct MainTabView: View {
     @State private var selectedTab = 0
 
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .white // Solid block
+        appearance.shadowColor = .clear // No shadow line
+        
+        // Default icon colors are handled by the system and .tint modifier
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             HomeView()
@@ -29,7 +41,7 @@ struct MainTabView: View {
                 }
                 .tag(3)
         }
-        .tint(.blue)
+        .tint(AppTheme.Colors.primary)
     }
 }
 

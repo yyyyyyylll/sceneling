@@ -71,3 +71,48 @@ async def get_me(current_user: CurrentUser):
         avatar_url=current_user.avatar_url,
         is_new_user=False
     )
+
+
+@router.post("/demo", response_model=TokenResponse)
+async def demo_login(db: DBSession):
+    """
+    演示模式登录（仅用于开发测试）
+    使用固定的演示用户，数据会正确关联
+    """
+    if not settings.DEBUG:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo login is only available in debug mode"
+        )
+
+    demo_apple_id = "demo_user_for_development"
+
+    # 查找或创建演示用户
+    result = await db.execute(
+        select(User).where(User.apple_id == demo_apple_id)
+    )
+    user = result.scalar_one_or_none()
+    is_new_user = False
+
+    if not user:
+        user = User(
+            apple_id=demo_apple_id,
+            nickname="开发测试用户",
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        is_new_user = True
+
+    # 生成 token
+    token = create_access_token(str(user.id))
+
+    return TokenResponse(
+        token=token,
+        user=UserBrief(
+            id=str(user.id),
+            nickname=user.nickname,
+            avatar_url=user.avatar_url,
+            is_new_user=is_new_user
+        )
+    )

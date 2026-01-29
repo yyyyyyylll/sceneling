@@ -31,8 +31,8 @@ struct HomeView: View {
                 }
                 .padding()
             }
-            .navigationTitle("SceneLing")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(AppTheme.Colors.background)
+            .navigationBarHidden(true)
             .fullScreenCover(isPresented: $showCamera) {
                 CameraView()
             }
@@ -43,13 +43,13 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text("生活随手拍")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text("地道学英语")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 4) {
+            Text("SceneLing")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+            Text("生活随手拍，地道学英语")
+                .font(.system(size: 12, design: .rounded))
+                .foregroundStyle(AppTheme.Colors.textSecondary)
         }
         .padding(.top, 20)
     }
@@ -58,55 +58,131 @@ struct HomeView: View {
         Button {
             showCamera = true
         } label: {
-            VStack(spacing: 12) {
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 40))
-                Text("拍照学习")
-                    .font(.headline)
-            }
-            .foregroundStyle(.white)
-            .frame(width: 160, height: 160)
-            .background(
+            ZStack {
+                // Outer pink circle
                 Circle()
-                    .fill(.blue.gradient)
-            )
-            .shadow(color: .blue.opacity(0.3), radius: 10, y: 5)
+                    .fill(AppTheme.Colors.accent)
+                    .frame(width: 144, height: 144)
+
+                // Inner white area
+                VStack(spacing: 6) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(AppTheme.Colors.primary)
+                    Text("拍照学习")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(AppTheme.Colors.primary)
+                }
+                .frame(width: 128, height: 128)
+                .background(
+                    Circle()
+                        .fill(Color.white)
+                )
+            }
+            .shadow(color: AppTheme.Colors.buttonShadow, radius: 50, y: 25)
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 30)
     }
 
     private var statsSection: some View {
-        HStack(spacing: 0) {
-            StatItem(value: "\(stats.totalScenes)", label: "场景")
-            Divider().frame(height: 40)
-            StatItem(value: "\(stats.totalDialogues)", label: "对话")
-            Divider().frame(height: 40)
-            StatItem(value: "\(stats.learningDays)", label: "天数")
+        HStack(spacing: 10) {
+            statCard(icon: "photo.stack", value: "\(stats.totalScenes)", label: "场景", color: AppTheme.Colors.Pastels.pink)
+            statCard(icon: "bubble.left.and.bubble.right.fill", value: "\(stats.totalDialogues)", label: "对话", color: AppTheme.Colors.Pastels.purple)
+            statCard(icon: "flame.fill", value: "\(stats.learningDays)", label: "连续天", color: AppTheme.Colors.Pastels.blue)
         }
-        .padding(.vertical, 16)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func statCard(icon: String, value: String, label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(color)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(value)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                Text(label)
+                    .font(.system(size: 8, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(AppTheme.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
     }
 
     private var recentScenesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("最近学习")
-                .font(.headline)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
 
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                ForEach(recentScenes.prefix(4)) { scene in
-                    NavigationLink {
-                        SceneDetailView(scene: scene)
-                    } label: {
-                        SceneCard(scene: scene)
+            // Group scenes by date
+            ForEach(groupedScenes, id: \.0) { dateLabel, scenes in
+                VStack(alignment: .leading, spacing: 8) {
+                    // Date label
+                    HStack(spacing: 6) {
+                        Text(dateLabel)
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                        Text("·")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                        Text("\(scenes.count)个场景")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
                     }
-                    .buttonStyle(.plain)
+
+                    // Horizontal scroll
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(scenes) { scene in
+                                NavigationLink {
+                                    SceneDetailView(scene: scene)
+                                } label: {
+                                    SceneCard(scene: scene)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private var groupedScenes: [(String, [LocalScene])] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+
+        var todayScenes: [LocalScene] = []
+        var yesterdayScenes: [LocalScene] = []
+        var olderScenes: [LocalScene] = []
+
+        for scene in recentScenes.prefix(10) {
+            let sceneDate = calendar.startOfDay(for: scene.createdAt)
+            if sceneDate == today {
+                todayScenes.append(scene)
+            } else if sceneDate == yesterday {
+                yesterdayScenes.append(scene)
+            } else {
+                olderScenes.append(scene)
+            }
+        }
+
+        var result: [(String, [LocalScene])] = []
+        if !todayScenes.isEmpty { result.append(("今天", todayScenes)) }
+        if !yesterdayScenes.isEmpty { result.append(("昨天", yesterdayScenes)) }
+        if !olderScenes.isEmpty { result.append(("更早", olderScenes)) }
+        return result
     }
 
     private func loadStats() async {
@@ -124,58 +200,38 @@ struct HomeView: View {
     }
 }
 
-struct StatItem: View {
-    let value: String
-    let label: String
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 struct SceneCard: View {
     let scene: LocalScene
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             if let photoData = scene.photoData,
                let uiImage = UIImage(data: photoData) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(height: 100)
-                    .clipped()
+                    .frame(width: 92, height: 92)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             } else {
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .frame(height: 100)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(red: 0.50, green: 0.23, blue: 0.27).opacity(0.50))
+                    .frame(width: 92, height: 92)
                     .overlay {
                         Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.6))
                     }
             }
 
             Text(scene.sceneTag)
-                .font(.caption)
-                .fontWeight(.medium)
-                .lineLimit(1)
-
-            Text(scene.sceneTagCn)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
                 .lineLimit(1)
         }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .padding(10)
+        .frame(width: 112)
+        .background(AppTheme.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
     }
 }
 

@@ -114,6 +114,7 @@ class SSEClient: NSObject, URLSessionDataDelegate {
                     case "audio":
                         let url = json["url"] as? String ?? ""
                         let audioText = json["text"] as? String ?? ""
+                        print("[SSEClient] Received audio event, URL length: \(url.count), text: \(audioText.prefix(30))")
                         event = .audio(url: url, text: audioText)
 
                     case "done":

@@ -87,11 +87,24 @@ class AuthManager: ObservableObject {
     }
 
     /// 演示模式登录（仅用于开发测试）
+    /// 会在后端创建真实的演示用户，数据能正确关联
     @MainActor
     func loginAsDemo() {
         #if DEBUG
-        UserDefaults.standard.set("demo_token", forKey: tokenKey)
-        isLoggedIn = true
+        isLoading = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let response = try await APIService.shared.demoLogin()
+                UserDefaults.standard.set(response.token, forKey: tokenKey)
+                currentUser = response.user
+                isLoggedIn = true
+            } catch {
+                errorMessage = "演示登录失败：\(error.localizedDescription)"
+            }
+            isLoading = false
+        }
         #endif
     }
 }

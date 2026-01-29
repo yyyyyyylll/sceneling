@@ -10,6 +10,7 @@ struct SceneDetailView: View {
     @State private var selectedUserRole: Role?
     @State private var selectedAIRole: Role?
     @State private var showSaveSuccess = false
+    @State private var pendingChatNavigation = false
 
     // 从 LocalScene 转换为 SceneAnalyzeResponse 用于 ChatView
     private var sceneContext: SceneAnalyzeResponse {
@@ -27,43 +28,33 @@ struct SceneDetailView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 0) {
-                    // Photo
-                    if let photoData = scene.photoData,
-                       let uiImage = UIImage(data: photoData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 250)
-                            .clipped()
-                    }
-
-                    // Scene Info
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(scene.sceneTag)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Text(scene.sceneTagCn)
-                                .foregroundStyle(.secondary)
+                    // Photo with category badge
+                    ZStack(alignment: .topLeading) {
+                        if let photoData = scene.photoData,
+                           let uiImage = UIImage(data: photoData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 200)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: AppTheme.Colors.cardShadow, radius: 6, y: 4)
                         }
-                        Spacer()
-                        Text(scene.category)
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color(.systemGray5))
-                            .clipShape(Capsule())
-                    }
-                    .padding()
 
-                    // Tab Picker
-                    Picker("", selection: $selectedTab) {
-                        Text("词汇").tag(0)
-                        Text("描述").tag(1)
-                        Text("例句").tag(2)
+                        // Category badge
+                        Text(scene.category)
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.9))
+                            .clipShape(Capsule())
+                            .padding(12)
                     }
-                    .pickerStyle(.segmented)
                     .padding(.horizontal)
+
+                    // Tab Selector
+                    ContentTabSelector(selectedTab: $selectedTab)
+                        .padding(.top, 16)
 
                     // Content
                     TabView(selection: $selectedTab) {
@@ -82,21 +73,21 @@ struct SceneDetailView: View {
                 }
             }
 
-            // Bottom Buttons - 与 ResultView 保持一致
+            // Bottom Buttons
             HStack(spacing: 12) {
-                // 保存按钮（已保存状态）
+                // 已保存状态按钮
                 Button {
                     showSaveSuccess = true
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle")
-                        Text("保存到场景库")
+                        Text("已保存")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.blue)
+                    .background(AppTheme.Colors.secondary)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
 
                 // AI对话按钮
@@ -109,32 +100,53 @@ struct SceneDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.green)
+                    .background(AppTheme.Colors.accent)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
             }
             .padding()
         }
         .navigationTitle("场景详情")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("取消") {
-                    dismiss()
+        .toolbar(.hidden, for: .tabBar)
+        .fullScreenCover(isPresented: $showRoleSelection) {
+            RoleSelectionView(
+                roles: scene.expressions.roles,
+                onConfirm: { userRole, aiRole in
+                    selectedUserRole = userRole
+                    selectedAIRole = aiRole
+                    pendingChatNavigation = true
+                },
+                sceneTag: scene.sceneTag,
+                sceneTagCn: scene.sceneTagCn,
+                category: scene.category,
+                photoData: scene.photoData,
+                createdAt: scene.createdAt
+            )
+        }
+        .onChange(of: showRoleSelection) { oldValue, newValue in
+            // When RoleSelectionView dismisses and we have pending navigation
+            if oldValue == true && newValue == false && pendingChatNavigation {
+                pendingChatNavigation = false
+                // Small delay to ensure the dismiss animation completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    showChat = true
                 }
             }
         }
-        .sheet(isPresented: $showRoleSelection) {
-            RoleSelectionView(roles: scene.expressions.roles) { userRole, aiRole in
-                selectedUserRole = userRole
-                selectedAIRole = aiRole
-                showChat = true
-            }
-        }
-        .sheet(isPresented: $showChat) {
+        .fullScreenCover(isPresented: $showChat) {
             if let userRole = selectedUserRole, let aiRole = selectedAIRole {
                 ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole)
+            } else {
+                // Fallback - should not happen, but prevents blank screen
+                Text("加载中...")
+                    .onAppear {
+                        // If no roles selected, dismiss
+                        if selectedUserRole == nil || selectedAIRole == nil {
+                            showChat = false
+                        }
+                    }
             }
         }
         .alert("已保存到场景库", isPresented: $showSaveSuccess) {

@@ -12,15 +12,15 @@ struct LoginView: View {
             VStack(spacing: 16) {
                 Image(systemName: "camera.viewfinder")
                     .font(.system(size: 80))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(AppTheme.Colors.primary) // [New Design] Green Logo
 
                 Text("SceneLing")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(Font.appTitle())
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
 
                 Text("生活随手拍，地道学英语")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .font(Font.appBody())
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
             }
 
             Spacer()
@@ -76,15 +76,23 @@ struct LoginView: View {
             .padding(.bottom, 20)
 
             #if DEBUG
-            Button("跳过登录（演示模式）") {
+            Button(action: {
                 authManager.loginAsDemo()
+            }) {
+                Text("跳过登录（开发测试）")
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: 280)
+                    .frame(height: 44)
+                    .background(Color.blue)
+                    .cornerRadius(10)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.bottom, 10)
+            .padding(.bottom, 20)
             #endif
         }
         .padding(.horizontal, 40)
+        .background(AppTheme.Colors.background) // [New Design] Cream Background
     }
 }
 

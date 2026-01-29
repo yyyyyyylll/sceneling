@@ -26,17 +26,52 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+// MARK: - API Environment Configuration
+enum APIEnvironment {
+    case development  // 模拟器
+    case localDevice  // 真机测试（局域网）
+    case production   // 生产环境
+
+    var baseURL: String {
+        switch self {
+        case .development:
+            return "http://127.0.0.1:8000/api"
+        case .localDevice:
+            // ⚠️ 真机测试时，使用 Cloudflare Tunnel（校园网环境）
+            return "https://realistic-belly-romance-graduated.trycloudflare.com/api"
+        case .production:
+            // ⚠️ 上线时，改成你的生产服务器地址
+            return "https://api.sceneling.com/api"
+        }
+    }
+
+    static var current: APIEnvironment {
+        #if DEBUG
+            #if targetEnvironment(simulator)
+                return .development
+            #else
+                return .localDevice
+            #endif
+        #else
+            return .production
+        #endif
+    }
+}
+
 class APIService {
     static let shared = APIService()
 
-    private let baseURL = "http://127.0.0.1:8000/api"  // 开发环境（iOS 模拟器用 127.0.0.1）
-    // private let baseURL = "https://api.sceneling.com/api"  // 生产环境
+    private var baseURL: String {
+        APIEnvironment.current.baseURL
+    }
 
     private var token: String? {
         UserDefaults.standard.string(forKey: "auth_token")
     }
 
-    private init() {}
+    private init() {
+        print("🌐 API Environment: \(APIEnvironment.current), URL: \(baseURL)")
+    }
 
     // MARK: - Auth
 
@@ -57,6 +92,11 @@ class APIService {
 
     func getMe() async throws -> UserBrief {
         return try await get("/auth/me")
+    }
+
+    /// 演示模式登录（仅开发测试）
+    func demoLogin() async throws -> TokenResponse {
+        return try await post("/auth/demo", body: EmptyBody())
     }
 
     // MARK: - Scenes
@@ -142,6 +182,56 @@ class APIService {
         let request = TTSRequest(text: text, voice: voice)
         let response: TTSResponse = try await post("/tts", body: request)
         return response.audioUrl
+    }
+
+    // MARK: - ASR (语音识别)
+
+    /// 使用后端 Paraformer 进行语音识别（带标点分句）
+    func speechToText(audioData: Data, language: String = "en") async throws -> String {
+        let url = URL(string: "\(baseURL)/asr")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        if let token = token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+
+        // Audio file
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
+        body.append(audioData)
+        body.append("\r\n".data(using: .utf8)!)
+
+        // Language parameter
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(language)\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        request.httpBody = body
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw APIError.unauthorized
+        }
+
+        guard 200...299 ~= httpResponse.statusCode else {
+            throw APIError.serverError(httpResponse.statusCode, nil)
+        }
+
+        let asrResponse = try JSONDecoder().decode(ASRResponse.self, from: data)
+        return asrResponse.text
     }
 
     // MARK: - User

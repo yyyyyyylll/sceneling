@@ -8,6 +8,10 @@ struct APIResponse<T: Codable>: Codable {
     let message: String?
 }
 
+// MARK: - Common
+
+struct EmptyBody: Codable {}
+
 // MARK: - Auth
 
 struct AppleAuthRequest: Codable {
@@ -177,4 +181,11 @@ struct ChatRequest: Codable {
 
 struct ChatResponse: Codable {
     let reply: String
+}
+
+// MARK: - ASR (语音识别)
+
+struct ASRResponse: Codable {
+    let text: String
+    let success: Bool
 }

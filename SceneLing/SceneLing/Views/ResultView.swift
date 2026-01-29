@@ -18,15 +18,33 @@ struct ResultView: View {
     @State private var selectedUserRole: Role?
     @State private var selectedAIRole: Role?
     @State private var pendingSceneId = UUID()
+    @State private var pendingChatNavigation = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Photo Preview
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(height: 200)
-                .clipped()
+            // Photo Preview with category badge
+            ZStack(alignment: .topLeading) {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: AppTheme.Colors.cardShadow, radius: 6, y: 4)
+
+                // Category badge (show when result is available)
+                if let result = analyzeResult {
+                    Text(result.category)
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.9))
+                        .clipShape(Capsule())
+                        .padding(12)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
 
             if isLoading {
                 loadingView
@@ -36,6 +54,7 @@ struct ResultView: View {
                 contentView(result)
             }
         }
+        .background(Color(red: 1, green: 0.97, blue: 0.93))
         .navigationTitle("学习内容")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
@@ -89,30 +108,9 @@ struct ResultView: View {
 
     private func contentView(_ result: SceneAnalyzeResponse) -> some View {
         VStack(spacing: 0) {
-            // Scene Tag
-            HStack {
-                Text(result.sceneTag)
-                    .font(.headline)
-                Text(result.sceneTagCn)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(result.category)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(.systemGray5))
-                    .clipShape(Capsule())
-            }
-            .padding()
-
-            // Tab Picker
-            Picker("", selection: $selectedTab) {
-                Text("词汇").tag(0)
-                Text("描述").tag(1)
-                Text("例句").tag(2)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
+            // Tab Selector
+            ContentTabSelector(selectedTab: $selectedTab)
+                .padding(.top, 16)
 
                     // Content
                     TabView(selection: $selectedTab) {
@@ -145,9 +143,9 @@ struct ResultView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.blue)
+                    .background(AppTheme.Colors.secondary)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .disabled(isSaving)
 
@@ -161,27 +159,50 @@ struct ResultView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.green)
+                    .background(AppTheme.Colors.accent)
                     .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
             }
             .padding()
         }
-        .sheet(isPresented: $showRoleSelection) {
+        .fullScreenCover(isPresented: $showRoleSelection) {
             if let result = analyzeResult {
-                RoleSelectionView(roles: result.expressions.roles) { userRole, aiRole in
-                    selectedUserRole = userRole
-                    selectedAIRole = aiRole
+                RoleSelectionView(
+                    roles: result.expressions.roles,
+                    onConfirm: { userRole, aiRole in
+                        selectedUserRole = userRole
+                        selectedAIRole = aiRole
+                        pendingChatNavigation = true
+                    },
+                    sceneTag: result.sceneTag,
+                    sceneTagCn: result.sceneTagCn,
+                    category: result.category,
+                    photoData: image.jpegData(compressionQuality: 0.8),
+                    createdAt: Date()
+                )
+            }
+        }
+        .onChange(of: showRoleSelection) { oldValue, newValue in
+            if oldValue == true && newValue == false && pendingChatNavigation {
+                pendingChatNavigation = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     showChat = true
                 }
             }
         }
-        .sheet(isPresented: $showChat) {
+        .fullScreenCover(isPresented: $showChat) {
             if let result = analyzeResult,
                let userRole = selectedUserRole,
                let aiRole = selectedAIRole {
                 ChatView(sceneContext: result, userRole: userRole, aiRole: aiRole)
+            } else {
+                Text("加载中...")
+                    .onAppear {
+                        if selectedUserRole == nil || selectedAIRole == nil {
+                            showChat = false
+                        }
+                    }
             }
         }
     }
@@ -234,20 +255,72 @@ struct ResultView: View {
     }
 }
 
+// MARK: - Custom Tab Selector
+
+struct ContentTabSelector: View {
+    @Binding var selectedTab: Int
+    let tabs = ["核心词汇", "场景描述", "口语表达"]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<tabs.count, id: \.self) { index in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTab = index
+                    }
+                } label: {
+                    Text(tabs[index])
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(selectedTab == index ? .white : Color(red: 0.29, green: 0.33, blue: 0.40))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(selectedTab == index ? AppTheme.Colors.secondary : .white)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(selectedTab == index ? Color.clear : Color(red: 0.90, green: 0.91, blue: 0.92), lineWidth: 0.5)
+                        )
+                        .shadow(color: selectedTab == index ? AppTheme.Colors.cardShadow : .clear, radius: 6, y: 4)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
 // MARK: - Card Views
 
 struct VocabularyCard: View {
     let objectTags: [ObjectTag]
     let sceneId: UUID?
 
+    // Gradient background colors for vocabulary items
+    private let cardColors: [Color] = [
+        Color(red: 1, green: 0.97, blue: 0.93),
+        Color(red: 1, green: 0.98, blue: 0.92),
+        Color(red: 1, green: 0.99, blue: 0.91),
+        Color(red: 1, green: 0.95, blue: 0.95),
+        Color(red: 0.99, green: 0.95, blue: 0.97)
+    ]
+
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(objectTags, id: \.en) { tag in
-                    VocabularyItem(tag: tag, sceneId: sceneId)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("核心词汇")
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .padding(.horizontal)
+
+                LazyVStack(spacing: 8) {
+                    ForEach(Array(objectTags.enumerated()), id: \.element.en) { index, tag in
+                        VocabularyItem(tag: tag, sceneId: sceneId, backgroundColor: cardColors[index % cardColors.count])
+                    }
                 }
+                .padding(.horizontal)
             }
-            .padding()
+            .padding(.top)
             .padding(.bottom, 20)
         }
     }
@@ -256,6 +329,7 @@ struct VocabularyCard: View {
 struct VocabularyItem: View {
     let tag: ObjectTag
     let sceneId: UUID?
+    var backgroundColor: Color = Color(red: 1, green: 0.97, blue: 0.93)
     @State private var isSaved = false
     @Environment(\.modelContext) private var modelContext
     @StateObject private var audioPlayer = AudioQueuePlayer.shared
@@ -263,48 +337,52 @@ struct VocabularyItem: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(tag.en)
-                        .font(.headline)
-                    Text(tag.phonetic)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(tag.pos)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color(.systemGray5))
-                        .clipShape(Capsule())
-                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tag.en)
+                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
                 Text(tag.cn)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
             }
 
             Spacer()
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                // Play button
                 Button {
                     speak(text: tag.en)
                 } label: {
-                    Image(systemName: "speaker.wave.2")
-                        .foregroundStyle(.blue)
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
                 }
                 .disabled(isSpeaking)
 
+                // Save button
                 Button {
                     saveNote()
                 } label: {
-                    Image(systemName: isSaved ? "checkmark.circle.fill" : "plus.circle")
-                        .foregroundStyle(isSaved ? .green : .blue)
+                    Image(systemName: isSaved ? "checkmark" : "plus")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(isSaved ? .green : AppTheme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
                 }
                 .accessibilityLabel("保存到笔记本")
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .frame(height: 70)
+        .background(backgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func saveNote() {
@@ -324,6 +402,8 @@ struct VocabularyItem: View {
 
     private func speak(text: String) {
         guard !text.isEmpty else { return }
+        // 停止之前的播放
+        audioPlayer.stop()
         isSpeaking = true
         LocalSpeechSynthesizer.shared.speak(text)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -335,41 +415,53 @@ struct VocabularyItem: View {
 struct DescriptionCard: View {
     let description: Description
     @State private var isSpeaking = false
+    @StateObject private var audioPlayer = AudioQueuePlayer.shared
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                Text("场景描述")
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("English")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
                         Spacer()
                         Button {
                             speak(text: description.en)
                         } label: {
-                            Image(systemName: "speaker.wave.2")
-                                .foregroundStyle(.blue)
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(AppTheme.Colors.textSecondary)
+                                .frame(width: 28, height: 28)
+                                .background(.white)
+                                .clipShape(Circle())
+                                .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
                         }
                         .disabled(isSpeaking)
                     }
                     Text(description.en)
-                        .font(.body)
+                        .font(.system(size: 14, design: .rounded))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color(red: 1, green: 0.97, blue: 0.93))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("中文")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
                     Text(description.cn)
-                        .font(.body)
+                        .font(.system(size: 14, design: .rounded))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color(red: 0.99, green: 0.95, blue: 0.97))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .padding()
             .padding(.bottom, 20)
@@ -378,6 +470,8 @@ struct DescriptionCard: View {
 
     private func speak(text: String) {
         guard !text.isEmpty else { return }
+        // 停止之前的播放
+        audioPlayer.stop()
         isSpeaking = true
         LocalSpeechSynthesizer.shared.speak(text)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -392,12 +486,20 @@ struct ExpressionCard: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
-                ForEach(expressions.roles, id: \.roleEn) { role in
-                    RoleSection(role: role, sceneId: sceneId)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("口语表达")
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .padding(.horizontal)
+
+                LazyVStack(spacing: 16) {
+                    ForEach(expressions.roles, id: \.roleEn) { role in
+                        RoleSection(role: role, sceneId: sceneId)
+                    }
                 }
+                .padding(.horizontal)
             }
-            .padding()
+            .padding(.top)
             .padding(.bottom, 20)
         }
     }
@@ -407,18 +509,27 @@ struct RoleSection: View {
     let role: Role
     let sceneId: UUID?
 
+    private let cardColors: [Color] = [
+        Color(red: 1, green: 0.97, blue: 0.93),
+        Color(red: 1, green: 0.98, blue: 0.92),
+        Color(red: 1, green: 0.99, blue: 0.91),
+        Color(red: 1, green: 0.95, blue: 0.95),
+        Color(red: 0.99, green: 0.95, blue: 0.97)
+    ]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(role.roleEn)
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
                 Text(role.roleCn)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
             }
 
-            ForEach(role.sentences, id: \.en) { sentence in
-                SentenceItem(sentence: sentence, role: role.roleCn, sceneId: sceneId)
+            ForEach(Array(role.sentences.enumerated()), id: \.element.en) { index, sentence in
+                SentenceItem(sentence: sentence, role: role.roleCn, sceneId: sceneId, backgroundColor: cardColors[index % cardColors.count])
             }
         }
     }
@@ -428,44 +539,58 @@ struct SentenceItem: View {
     let sentence: Sentence
     let role: String?
     let sceneId: UUID?
+    var backgroundColor: Color = Color(red: 1, green: 0.97, blue: 0.93)
     @State private var isSaved = false
     @Environment(\.modelContext) private var modelContext
     @StateObject private var audioPlayer = AudioQueuePlayer.shared
     @State private var isSpeaking = false
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(sentence.en)
-                    .font(.body)
+                    .font(.system(size: 16, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textPrimary)
                 Text(sentence.cn)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, design: .rounded))
+                    .foregroundStyle(AppTheme.Colors.textSecondary)
             }
 
             Spacer()
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Button {
                     speak(text: sentence.en)
                 } label: {
-                    Image(systemName: "speaker.wave.2")
-                        .foregroundStyle(.blue)
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
                 }
                 .disabled(isSpeaking)
 
                 Button {
                     saveNote()
                 } label: {
-                    Image(systemName: isSaved ? "checkmark.circle.fill" : "plus.circle")
-                        .foregroundStyle(isSaved ? .green : .blue)
+                    Image(systemName: isSaved ? "checkmark" : "plus")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(isSaved ? .green : AppTheme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
                 }
                 .accessibilityLabel("保存到笔记本")
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .frame(minHeight: 70)
+        .background(backgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func saveNote() {
@@ -485,6 +610,8 @@ struct SentenceItem: View {
 
     private func speak(text: String) {
         guard !text.isEmpty else { return }
+        // 停止之前的播放
+        audioPlayer.stop()
         isSpeaking = true
         LocalSpeechSynthesizer.shared.speak(text)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
