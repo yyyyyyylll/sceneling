@@ -8,6 +8,7 @@ struct SceneLibraryView: View {
 
     @State private var searchText = ""
     @State private var showCamera = false
+    @State private var showNotes = false
     @State private var showFilterPanel = false
     @StateObject private var filterState = FilterState()
 
@@ -68,6 +69,11 @@ struct SceneLibraryView: View {
             .navigationBarHidden(true)
             .fullScreenCover(isPresented: $showCamera) {
                 CameraView()
+            }
+            .fullScreenCover(isPresented: $showNotes) {
+                NavigationStack {
+                    NotesView()
+                }
             }
         }
     }
@@ -232,22 +238,12 @@ struct SceneLibraryView: View {
             HStack {
                 Spacer()
                 VStack(spacing: 12) {
-                    // Button 1 - Grid view (placeholder)
-                    FloatingActionButton(icon: "square.grid.2x2", color: Color.white) {
-                        // TODO: Toggle grid view
-                    }
-
-                    // Button 2 - Translation (placeholder)
-                    FloatingActionButton(icon: "character.book.closed", color: Color.white) {
-                        // TODO: Translation feature
-                    }
-
-                    // Button 3 - AI Chat
+                    // Button 1 - Notes
                     FloatingActionButton(icon: "book.fill", color: Color(red: 0.32, green: 0.64, blue: 1)) {
-                        // TODO: AI learning feature
+                        showNotes = true
                     }
 
-                    // Button 4 - Camera
+                    // Button 2 - Camera
                     FloatingActionButton(icon: "sparkles", color: AppTheme.Colors.accent) {
                         showCamera = true
                     }

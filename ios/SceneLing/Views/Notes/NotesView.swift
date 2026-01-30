@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct NotesView: View {
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \LocalNote.createdAt, order: .reverse) private var notes: [LocalNote]
 
     @State private var selectedType: NoteType?
@@ -71,6 +72,18 @@ struct NotesView: View {
             }
         }
         .navigationTitle("我的笔记")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("返回")
+                    }
+                }
+            }
+        }
         .searchable(text: $searchText, prompt: "搜索笔记")
     }
 }

@@ -341,6 +341,11 @@ struct VocabularyItem: View {
                 Text(tag.en)
                     .font(.system(size: 16, weight: .regular, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textPrimary)
+                if !tag.phonetic.isEmpty {
+                    Text(tag.phonetic)
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                }
                 Text(tag.cn)
                     .font(.system(size: 14, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textSecondary)

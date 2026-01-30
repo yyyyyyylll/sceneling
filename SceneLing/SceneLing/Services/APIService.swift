@@ -38,7 +38,7 @@ enum APIEnvironment {
             return "http://127.0.0.1:8000/api"
         case .localDevice:
             // ⚠️ 真机测试时，使用 Cloudflare Tunnel（校园网环境）
-            return "https://realistic-belly-romance-graduated.trycloudflare.com/api"
+            return "https://pittsburgh-essex-adelaide-const.trycloudflare.com/api"
         case .production:
             // ⚠️ 上线时，改成你的生产服务器地址
             return "https://api.sceneling.com/api"
@@ -184,54 +184,17 @@ class APIService {
         return response.audioUrl
     }
 
-    // MARK: - ASR (语音识别)
+    // MARK: - ASR (语音识别 / 标点分句)
 
-    /// 使用后端 Paraformer 进行语音识别（带标点分句）
-    func speechToText(audioData: Data, language: String = "en") async throws -> String {
-        let url = URL(string: "\(baseURL)/asr")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-
-        let boundary = UUID().uuidString
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        var body = Data()
-
-        // Audio file
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(audioData)
-        body.append("\r\n".data(using: .utf8)!)
-
-        // Language parameter
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
-        body.append("\(language)\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-
-        request.httpBody = body
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw APIError.unauthorized
-        }
-
-        guard 200...299 ~= httpResponse.statusCode else {
-            throw APIError.serverError(httpResponse.statusCode, nil)
-        }
-
-        let asrResponse = try JSONDecoder().decode(ASRResponse.self, from: data)
-        return asrResponse.text
+    /// 使用后端 qwen-turbo 给文本添加标点和分句
+    /// - Parameters:
+    ///   - text: iOS 原生语音识别的无标点文本
+    ///   - language: 语言代码 ("en" 英语, "zh" 中文)
+    /// - Returns: 添加标点后的文本
+    func addPunctuation(text: String, language: String = "en") async throws -> String {
+        let request = PunctuationRequest(text: text, language: language)
+        let response: ASRResponse = try await post("/asr", body: request)
+        return response.text
     }
 
     // MARK: - User

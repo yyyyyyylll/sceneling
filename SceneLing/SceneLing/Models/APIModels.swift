@@ -183,7 +183,12 @@ struct ChatResponse: Codable {
     let reply: String
 }
 
-// MARK: - ASR (语音识别)
+// MARK: - ASR (语音识别 / 标点分句)
+
+struct PunctuationRequest: Codable {
+    let text: String
+    let language: String
+}
 
 struct ASRResponse: Codable {
     let text: String

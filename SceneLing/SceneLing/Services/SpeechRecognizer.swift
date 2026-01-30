@@ -6,10 +6,8 @@ import AVFoundation
 class SpeechRecognizer: ObservableObject {
     static let shared = SpeechRecognizer()
 
-    @Published var transcript: String = ""           // iOS 原生实时识别结果
-    @Published var finalTranscript: String = ""      // 后端 Paraformer 最终识别结果（带标点）
+    @Published var transcript: String = ""           // iOS 17+ 原生识别结果（自带标点）
     @Published var isRecording: Bool = false
-    @Published var isProcessing: Bool = false        // 是否正在后端处理
     @Published var errorMessage: String?
     @Published var recordedAudioData: Data?          // 录音的音频数据
 
@@ -74,6 +72,7 @@ class SpeechRecognizer: ObservableObject {
         }
 
         recognitionRequest.shouldReportPartialResults = true
+        recognitionRequest.addsPunctuation = true  // iOS 17+ 原生标点支持
 
         // 创建音频引擎
         audioEngine = AVAudioEngine()
@@ -249,62 +248,24 @@ class SpeechRecognizer: ObservableObject {
         }
     }
 
-    // MARK: - Backend ASR (Paraformer)
+    // MARK: - Final Transcript (iOS 17+ 原生标点)
 
-    /// 使用后端 Paraformer 进行最终识别（带标点分句）
-    /// 返回识别结果，同时更新 finalTranscript
-    func getFinalTranscript() async -> String? {
-        guard let audioData = recordedAudioData, !audioData.isEmpty else {
-            print("[SpeechRecognizer] No recorded audio data for final transcription")
-            return nil
-        }
-
-        await MainActor.run {
-            isProcessing = true
-        }
-
-        do {
-            let result = try await APIService.shared.speechToText(audioData: audioData, language: "en")
-            await MainActor.run {
-                finalTranscript = result
-                isProcessing = false
-            }
-            print("[SpeechRecognizer] Final transcript: \(result)")
-            return result
-        } catch {
-            print("[SpeechRecognizer] Backend ASR failed: \(error)")
-            await MainActor.run {
-                isProcessing = false
-                // 失败时使用 iOS 原生识别结果
-                finalTranscript = transcript
-            }
-            return transcript.isEmpty ? nil : transcript
-        }
-    }
-
-    /// 停止录音并获取最终识别结果（带标点）
-    /// 这是混合方案的主入口
+    /// 停止录音并获取最终识别结果（iOS 17+ 自带标点）
     func stopAndGetFinalTranscript() async -> (text: String, audioData: Data?)? {
-        // 先保存当前的实时识别结果
-        let realtimeText = transcript
+        // 保存当前识别结果（已带标点）
+        let text = transcript
 
         // 停止录音
         stopRecording()
 
-        // 等待音频数据准备好
-        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3秒
+        // 等待停止完成
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
 
-        guard let audioData = recordedAudioData, !audioData.isEmpty else {
-            // 没有录音数据，返回实时识别结果
-            return realtimeText.isEmpty ? nil : (realtimeText, nil)
+        guard !text.isEmpty else {
+            return nil
         }
 
-        // 调用后端 ASR 获取带标点的结果
-        if let finalText = await getFinalTranscript(), !finalText.isEmpty {
-            return (finalText, audioData)
-        }
-
-        // 后端失败，使用实时识别结果
-        return realtimeText.isEmpty ? nil : (realtimeText, audioData)
+        print("[SpeechRecognizer] Final transcript: \(text)")
+        return (text, recordedAudioData)
     }
 }

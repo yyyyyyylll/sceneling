@@ -215,21 +215,11 @@ struct ChatView: View {
                     }
                 } label: {
                     HStack(spacing: 8) {
-                        if speechRecognizer.isProcessing {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .tint(.white)
-                        } else {
-                            Image(systemName: speechRecognizer.isRecording ? "stop.fill" : "mic.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.white)
-                        }
+                        Image(systemName: speechRecognizer.isRecording ? "stop.fill" : "mic.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
 
-                        if speechRecognizer.isProcessing {
-                            Text("识别中...")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white)
-                        } else if speechRecognizer.isRecording {
+                        if speechRecognizer.isRecording {
                             Text(speechRecognizer.transcript.isEmpty ? "正在听..." : speechRecognizer.transcript)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.white)
@@ -243,14 +233,13 @@ struct ChatView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
                     .background(
-                        speechRecognizer.isProcessing ? Color.orange.opacity(0.8) :
                         speechRecognizer.isRecording ? Color.red.opacity(0.8) :
                         Color(red: 0.68, green: 0.27, blue: 1)
                     )
                     .cornerRadius(10)
                     .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
                 }
-                .disabled(isLoading || speechRecognizer.isProcessing)
+                .disabled(isLoading)
             } else {
                 // 文本输入模式
                 HStack(spacing: 8) {
