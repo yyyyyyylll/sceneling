@@ -232,7 +232,8 @@ class APIService {
         sceneContext: SceneAnalyzeResponse,
         userRole: Role,
         aiRole: Role,
-        history: [(String, Bool)]
+        history: [(String, Bool)],
+        sessionId: String?
     ) async throws -> String {
         let request = ChatRequest(
             message: message,
@@ -242,10 +243,33 @@ class APIService {
             roles: sceneContext.expressions.roles.map { "\($0.roleEn) (\($0.roleCn))" },
             userRole: "\(userRole.roleEn) (\(userRole.roleCn))",
             aiRole: "\(aiRole.roleEn) (\(aiRole.roleCn))",
-            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) }
+            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) },
+            sessionId: sessionId
         )
         let response: ChatResponse = try await post("/chat", body: request)
         return response.reply
+    }
+
+    func chatResponse(
+        message: String,
+        sceneContext: SceneAnalyzeResponse,
+        userRole: Role,
+        aiRole: Role,
+        history: [(String, Bool)],
+        sessionId: String?
+    ) async throws -> ChatResponse {
+        let request = ChatRequest(
+            message: message,
+            sceneTag: sceneContext.sceneTag,
+            sceneTagCn: sceneContext.sceneTagCn,
+            category: sceneContext.category,
+            roles: sceneContext.expressions.roles.map { "\($0.roleEn) (\($0.roleCn))" },
+            userRole: "\(userRole.roleEn) (\(userRole.roleCn))",
+            aiRole: "\(aiRole.roleEn) (\(aiRole.roleCn))",
+            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) },
+            sessionId: sessionId
+        )
+        return try await post("/chat", body: request)
     }
 
     func chatStream(
@@ -254,6 +278,7 @@ class APIService {
         userRole: Role,
         aiRole: Role,
         history: [(String, Bool)],
+        sessionId: String?,
         onEvent: @escaping (SSEEvent) -> Void,
         onComplete: @escaping () -> Void
     ) -> SSEClient {
@@ -265,7 +290,8 @@ class APIService {
             roles: sceneContext.expressions.roles.map { "\($0.roleEn) (\($0.roleCn))" },
             userRole: "\(userRole.roleEn) (\(userRole.roleCn))",
             aiRole: "\(aiRole.roleEn) (\(aiRole.roleCn))",
-            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) }
+            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) },
+            sessionId: sessionId
         )
 
         let url = URL(string: "\(baseURL)/chat/stream")!
@@ -287,12 +313,14 @@ class APIService {
     func freeChatStream(
         message: String,
         history: [(String, Bool)],
+        sessionId: String?,
         onEvent: @escaping (SSEEvent) -> Void,
         onComplete: @escaping () -> Void
     ) -> SSEClient {
         let request = FreeChatRequest(
             message: message,
-            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) }
+            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) },
+            sessionId: sessionId
         )
 
         let url = URL(string: "\(baseURL)/chat/free/stream")!

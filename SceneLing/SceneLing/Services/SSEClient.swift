@@ -3,6 +3,7 @@ import Foundation
 enum SSEEvent {
     case textDelta(String)
     case textFull(String)
+    case translation(String)
     case audio(url: String, text: String)
     case done
     case error(String)
@@ -163,6 +164,10 @@ class SSEClient: NSObject, URLSessionDataDelegate {
                     case "text_full":
                         let content = json["content"] as? String ?? ""
                         event = .textFull(content)
+
+                    case "translation":
+                        let content = json["content"] as? String ?? ""
+                        event = .translation(content)
 
                     case "audio":
                         let url = json["url"] as? String ?? ""

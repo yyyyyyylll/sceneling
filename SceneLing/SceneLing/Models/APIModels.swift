@@ -256,6 +256,7 @@ struct ChatRequest: Codable {
     let userRole: String
     let aiRole: String
     let history: [ChatMessage]
+    let sessionId: String?
 
     enum CodingKeys: String, CodingKey {
         case message
@@ -266,16 +267,19 @@ struct ChatRequest: Codable {
         case userRole = "user_role"
         case aiRole = "ai_role"
         case history
+        case sessionId = "session_id"
     }
 }
 
 struct ChatResponse: Codable {
     let reply: String
+    let translation: String?
 }
 
 struct FreeChatRequest: Codable {
     let message: String
     let history: [ChatMessage]
+    let sessionId: String?
 }
 
 // MARK: - ASR (语音识别 / 标点分句)

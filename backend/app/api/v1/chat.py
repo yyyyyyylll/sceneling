@@ -6,6 +6,7 @@ import json
 
 from app.services.chat import chat_with_scene, chat_with_scene_stream, free_chat_stream
 from app.services.aliyun_tts import text_to_speech
+from app.services.translation import translate_to_zh
 
 router = APIRouter()
 
@@ -24,10 +25,12 @@ class ChatRequest(BaseModel):
     user_role: str
     ai_role: str
     history: Optional[List[ChatMessage]] = []
+    session_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     reply: str
+    translation: Optional[str] = None
 
 
 @router.post("", response_model=ChatResponse)
@@ -48,8 +51,9 @@ async def chat(request: ChatRequest):
         ai_role=request.ai_role,
         history=history
     )
+    translation = await translate_to_zh(reply, request.session_id)
 
-    return ChatResponse(reply=reply)
+    return ChatResponse(reply=reply, translation=translation)
 
 
 @router.post("/stream")
@@ -88,6 +92,14 @@ async def chat_stream(request: ChatRequest):
                         "content": content
                     }, ensure_ascii=False)
                     yield f"data: {data}\n\n"
+
+                    translation = await translate_to_zh(content, request.session_id)
+                    if translation:
+                        data = json.dumps({
+                            "type": "translation",
+                            "content": translation
+                        }, ensure_ascii=False)
+                        yield f"data: {data}\n\n"
 
                     # 生成整段 TTS（等待文本完全生成后再发音）
                     english_text = _extract_english(content)
@@ -136,6 +148,7 @@ async def chat_stream(request: ChatRequest):
 class FreeChatRequest(BaseModel):
     message: str
     history: Optional[List[ChatMessage]] = []
+    session_id: Optional[str] = None
 
 
 @router.post("/free/stream")
@@ -168,6 +181,14 @@ async def free_chat_stream_endpoint(request: FreeChatRequest):
                         "content": content
                     }, ensure_ascii=False)
                     yield f"data: {data}\n\n"
+
+                    translation = await translate_to_zh(content, request.session_id)
+                    if translation:
+                        data = json.dumps({
+                            "type": "translation",
+                            "content": translation
+                        }, ensure_ascii=False)
+                        yield f"data: {data}\n\n"
 
                     # 生成整段 TTS
                     english_text = _extract_english(content)

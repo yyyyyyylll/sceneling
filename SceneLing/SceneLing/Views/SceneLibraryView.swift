@@ -411,7 +411,7 @@ struct SceneLibraryCard: View {
         }
         .fullScreenCover(isPresented: $showChat) {
             if let userRole = selectedUserRole, let aiRole = selectedAIRole {
-                ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole)
+                ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole, photoData: scene.photoData, isPresented: $showChat)
                     .onAppear {
                         didStartChat = true
                     }

@@ -206,7 +206,7 @@ struct ResultView: View {
             if let result = analyzeResult,
                let userRole = selectedUserRole,
                let aiRole = selectedAIRole {
-                ChatView(sceneContext: result, userRole: userRole, aiRole: aiRole)
+                ChatView(sceneContext: result, userRole: userRole, aiRole: aiRole, photoData: image.jpegData(compressionQuality: 0.8), isPresented: $showChat)
             } else {
                 Text("加载中...")
                     .onAppear {

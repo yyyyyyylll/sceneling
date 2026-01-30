@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UIKit
 
 class LocalChatMessage: Identifiable, ObservableObject {
     let id = UUID()
@@ -9,6 +10,8 @@ class LocalChatMessage: Identifiable, ObservableObject {
     var roleName: String = ""
     var cachedAudioURL: String?  // 缓存TTS音频URL (AI消息)
     var recordedAudioData: Data?  // 缓存录音数据 (用户消息)
+    @Published var translation: String?  // 中文翻译
+    @Published var showTranslation: Bool = false
 
     init(content: String, isUser: Bool, roleName: String = "", recordedAudioData: Data? = nil) {
         self.content = content
@@ -26,6 +29,8 @@ struct ChatView: View {
     let sceneContext: SceneAnalyzeResponse
     let userRole: Role
     let aiRole: Role
+    var photoData: Data? = nil
+    @Binding var isPresented: Bool
     @Environment(\.dismiss) private var dismiss
 
     @State private var messages: [LocalChatMessage] = []
@@ -38,14 +43,17 @@ struct ChatView: View {
     @State private var sseClient: SSEClient?
     @State private var enableTTS = true
     @State private var isVoiceInputMode = true  // 默认语音输入模式
+    @State private var sessionId = UUID().uuidString
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             chatHeader
+                .zIndex(2)
 
             // Scene Preview Card
             scenePreviewCard
+                .zIndex(1)
 
             // Messages
             ScrollViewReader { proxy in
@@ -104,6 +112,7 @@ struct ChatView: View {
             HStack {
                 // Back button
                 Button {
+                    isPresented = false
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
@@ -119,6 +128,7 @@ struct ChatView: View {
                 // End button (功能待确认)
                 Button {
                     // TODO: 待确认功能 - 暂时设为返回
+                    isPresented = false
                     dismiss()
                 } label: {
                     Text("结束")
@@ -144,54 +154,48 @@ struct ChatView: View {
 
     // MARK: - Scene Preview Card
     private var scenePreviewCard: some View {
-        ZStack {
-            // Placeholder colored background
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.50, green: 0.23, blue: 0.27).opacity(0.5),
-                            Color(red: 0.68, green: 0.28, blue: 1).opacity(0.3)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topLeading) {
+                if let photoData = photoData,
+                   let uiImage = UIImage(data: photoData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 190)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                } else {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(red: 0.90, green: 0.91, blue: 0.92))
+                        .frame(height: 190)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.system(size: 24))
+                                .foregroundStyle(Color(red: 0.60, green: 0.62, blue: 0.65))
+                        )
+                }
 
-            // Scene info overlay
-            VStack(alignment: .leading, spacing: 4) {
-                Text(sceneContext.sceneTagCn)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white)
-                Text("\(userRole.roleCn) vs \(aiRole.roleCn)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.8))
+                Text(sceneContext.sceneTag)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color(red: 0.10, green: 0.10, blue: 0.10))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.85))
+                    .clipShape(Capsule())
+                    .padding(10)
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text("\(aiRole.roleEn) - \(userRole.roleEn)")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(red: 0.38, green: 0.40, blue: 0.45))
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(height: 128)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .shadow(color: Color.black.opacity(0.1), radius: 2, y: 1)
     }
 
     // MARK: - Input Area
     private var inputArea: some View {
         HStack(spacing: 8) {
-            // 左侧按钮 (功能待定)
-            Button {
-                // TODO: 功能待定
-            } label: {
-                Text("英")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(red: 0.29, green: 0.33, blue: 0.40))
-                    .frame(width: 44, height: 44)
-                    .background(Color(red: 0.95, green: 0.96, blue: 0.96))
-                    .clipShape(Circle())
-                    .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
-            }
-
             // 中间输入区域
             if isVoiceInputMode {
                 // 语音输入模式
@@ -300,13 +304,34 @@ struct ChatView: View {
     private func sendInitialMessage() {
         // 防止重复发送初始消息
         guard messages.isEmpty else { return }
-        let greeting = generateGreeting()
-        let message = LocalChatMessage(content: greeting, isUser: false, roleName: aiRole.roleCn)
-        messages.append(message)
-    }
+        isLoading = true
+        let aiMessage = LocalChatMessage(content: "", isUser: false, roleName: aiRole.roleCn)
+        messages.append(aiMessage)
 
-    private func generateGreeting() -> String {
-        return "已选择角色：你是\(userRole.roleCn)，AI是\(aiRole.roleCn)。开始对话吧！"
+        let openerPrompt = "Start the conversation with one friendly, natural opening line that fits our scene."
+
+        Task {
+            do {
+                let response = try await APIService.shared.chatResponse(
+                    message: openerPrompt,
+                    sceneContext: sceneContext,
+                    userRole: userRole,
+                    aiRole: aiRole,
+                    history: [],
+                    sessionId: sessionId
+                )
+                await MainActor.run {
+                    aiMessage.content = response.reply
+                    aiMessage.translation = response.translation
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    aiMessage.append("\n[错误: \(error.localizedDescription)]")
+                    self.isLoading = false
+                }
+            }
+        }
     }
 
     private func sendMessage() {
@@ -328,6 +353,7 @@ struct ChatView: View {
             userRole: userRole,
             aiRole: aiRole,
             history: Array(history),
+            sessionId: sessionId,
             onEvent: { [weak aiMessage] event in
                 switch event {
                 case .textDelta(let text):
@@ -335,6 +361,9 @@ struct ChatView: View {
 
                 case .textFull(let text):
                     aiMessage?.append(text)
+
+                case .translation(let text):
+                    aiMessage?.translation = text
 
                 case .audio(let url, _):
                     // 缓存音频URL到消息对象
@@ -351,6 +380,9 @@ struct ChatView: View {
                     self.isLoading = false
 
                 case .error(let message):
+                    if message.lowercased().contains("cancelled") {
+                        break
+                    }
                     aiMessage?.append("\n[错误: \(message)]")
                     self.isLoading = false
 
@@ -394,6 +426,7 @@ struct ChatView: View {
             userRole: userRole,
             aiRole: aiRole,
             history: Array(history),
+            sessionId: sessionId,
             onEvent: { [weak aiMessage] event in
                 switch event {
                 case .textDelta(let text):
@@ -401,6 +434,9 @@ struct ChatView: View {
 
                 case .textFull(let text):
                     aiMessage?.append(text)
+
+                case .translation(let text):
+                    aiMessage?.translation = text
 
                 case .audio(let url, _):
                     print("[ChatView] Received audio event (voice), URL length: \(url.count)")
@@ -416,6 +452,9 @@ struct ChatView: View {
                     self.isLoading = false
 
                 case .error(let message):
+                    if message.lowercased().contains("cancelled") {
+                        break
+                    }
                     aiMessage?.append("\n[错误: \(message)]")
                     self.isLoading = false
 
@@ -491,6 +530,13 @@ struct MessageBubble: View {
                     .foregroundStyle(Color(red: 0.04, green: 0.04, blue: 0.04))
                     .animation(.easeInOut(duration: 0.1), value: message.content)
 
+                if message.showTranslation, let translation = message.translation, !translation.isEmpty {
+                    Text(translation)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0.29, green: 0.33, blue: 0.40))
+                        .animation(.easeInOut(duration: 0.1), value: message.showTranslation)
+                }
+
                 // Action buttons
                 HStack(spacing: 8) {
                     // Play audio button (紫色) - 调用通义千问TTS
@@ -514,9 +560,9 @@ struct MessageBubble: View {
 
                     // Second button (蓝色) - 功能待确认
                     Button {
-                        // TODO: 待确认功能
+                        message.showTranslation.toggle()
                     } label: {
-                        Image(systemName: "doc.on.doc")
+                        Image(systemName: "translate")
                             .font(.system(size: 10))
                             .foregroundStyle(Color(red: 0.32, green: 0.64, blue: 1))
                             .frame(width: 24, height: 24)
@@ -671,5 +717,6 @@ struct TypingIndicator: View {
         ]),
         category: "餐饮"
     ), userRole: Role(roleEn: "Customer", roleCn: "顾客", sentences: []),
-       aiRole: Role(roleEn: "Barista", roleCn: "咖啡师", sentences: []))
+       aiRole: Role(roleEn: "Barista", roleCn: "咖啡师", sentences: []),
+       isPresented: .constant(true))
 }

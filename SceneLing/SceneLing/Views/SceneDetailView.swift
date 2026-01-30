@@ -137,7 +137,7 @@ struct SceneDetailView: View {
         }
         .fullScreenCover(isPresented: $showChat) {
             if let userRole = selectedUserRole, let aiRole = selectedAIRole {
-                ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole)
+                ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole, photoData: scene.photoData, isPresented: $showChat)
             } else {
                 // Fallback - should not happen, but prevents blank screen
                 Text("加载中...")

@@ -14,6 +14,7 @@ struct FreeChatView: View {
     @State private var sseClient: SSEClient?
     @State private var enableTTS = true
     @State private var isVoiceInputMode = true
+    @State private var sessionId = UUID().uuidString
 
     var body: some View {
         VStack(spacing: 0) {
@@ -110,19 +111,6 @@ struct FreeChatView: View {
     // MARK: - Input Area
     private var inputArea: some View {
         HStack(spacing: 8) {
-            // 左侧按钮
-            Button {
-                // TODO: 功能待定
-            } label: {
-                Text("英")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color(red: 0.29, green: 0.33, blue: 0.40))
-                    .frame(width: 44, height: 44)
-                    .background(Color(red: 0.95, green: 0.96, blue: 0.96))
-                    .clipShape(Circle())
-                    .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
-            }
-
             // 中间输入区域
             if isVoiceInputMode {
                 Button {
@@ -245,6 +233,7 @@ struct FreeChatView: View {
         sseClient = APIService.shared.freeChatStream(
             message: userMessage,
             history: Array(history),
+            sessionId: sessionId,
             onEvent: { [weak aiMessage] event in
                 switch event {
                 case .textDelta(let text):
@@ -252,6 +241,9 @@ struct FreeChatView: View {
 
                 case .textFull(let text):
                     aiMessage?.append(text)
+
+                case .translation(let text):
+                    aiMessage?.translation = text
 
                 case .audio(let url, _):
                     aiMessage?.cachedAudioURL = url
@@ -299,6 +291,7 @@ struct FreeChatView: View {
         sseClient = APIService.shared.freeChatStream(
             message: userMessage,
             history: Array(history),
+            sessionId: sessionId,
             onEvent: { [weak aiMessage] event in
                 switch event {
                 case .textDelta(let text):
@@ -306,6 +299,9 @@ struct FreeChatView: View {
 
                 case .textFull(let text):
                     aiMessage?.append(text)
+
+                case .translation(let text):
+                    aiMessage?.translation = text
 
                 case .audio(let url, _):
                     aiMessage?.cachedAudioURL = url
@@ -379,6 +375,13 @@ struct FreeMessageBubble: View {
                 .foregroundStyle(Color(red: 0.04, green: 0.04, blue: 0.04))
                 .animation(.easeInOut(duration: 0.1), value: message.content)
 
+            if message.showTranslation, let translation = message.translation, !translation.isEmpty {
+                Text(translation)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0.29, green: 0.33, blue: 0.40))
+                    .animation(.easeInOut(duration: 0.1), value: message.showTranslation)
+            }
+
             HStack(spacing: 8) {
                 Button {
                     playAudio()
@@ -397,6 +400,17 @@ struct FreeMessageBubble: View {
                     }
                 }
                 .disabled(isLoadingAudio)
+
+                Button {
+                    message.showTranslation.toggle()
+                } label: {
+                    Image(systemName: "translate")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color(red: 0.32, green: 0.64, blue: 1))
+                        .frame(width: 24, height: 24)
+                        .background(Color(red: 0.86, green: 0.92, blue: 1))
+                        .clipShape(Circle())
+                }
             }
         }
         .padding(.horizontal, 14)
