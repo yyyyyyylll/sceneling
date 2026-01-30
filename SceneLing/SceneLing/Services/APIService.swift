@@ -145,6 +145,28 @@ class APIService {
         return try JSONDecoder().decode(SceneAnalyzeResponse.self, from: data)
     }
 
+    /// 流式分析图片（两阶段返回）
+    func analyzeImageStream(
+        _ imageData: Data,
+        cefrLevel: String = "B1",
+        onEvent: @escaping (SSEEvent) -> Void,
+        onComplete: @escaping () -> Void
+    ) -> SSEClient {
+        let url = URL(string: "\(baseURL)/scenes/analyze/stream")!
+
+        let client = SSEClient()
+        client.connectWithImage(
+            url: url,
+            imageData: imageData,
+            cefrLevel: cefrLevel,
+            token: token,
+            onEvent: onEvent,
+            onComplete: onComplete
+        )
+
+        return client
+    }
+
     func createScene(_ request: SceneCreateRequest) async throws -> LocalScene {
         // TODO: 实现场景保存
         fatalError("Not implemented")
@@ -247,6 +269,33 @@ class APIService {
         )
 
         let url = URL(string: "\(baseURL)/chat/stream")!
+        let body = try! JSONEncoder().encode(request)
+
+        let client = SSEClient()
+        client.connect(
+            url: url,
+            body: body,
+            token: token,
+            onEvent: onEvent,
+            onComplete: onComplete
+        )
+
+        return client
+    }
+
+    /// 自由对话（无场景限制）- 流式
+    func freeChatStream(
+        message: String,
+        history: [(String, Bool)],
+        onEvent: @escaping (SSEEvent) -> Void,
+        onComplete: @escaping () -> Void
+    ) -> SSEClient {
+        let request = FreeChatRequest(
+            message: message,
+            history: history.map { ChatMessage(content: $0.0, isUser: $0.1) }
+        )
+
+        let url = URL(string: "\(baseURL)/chat/free/stream")!
         let body = try! JSONEncoder().encode(request)
 
         let client = SSEClient()

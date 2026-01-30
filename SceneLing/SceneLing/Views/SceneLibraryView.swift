@@ -10,6 +10,7 @@ struct SceneLibraryView: View {
     @State private var showCamera = false
     @State private var showNotes = false
     @State private var showFilterPanel = false
+    @State private var showFreeChat = false
     @StateObject private var filterState = FilterState()
 
     private let categories = ["全部", "日常", "学习", "旅行", "购物", "美食", "其他"]
@@ -74,6 +75,9 @@ struct SceneLibraryView: View {
                 NavigationStack {
                     NotesView()
                 }
+            }
+            .fullScreenCover(isPresented: $showFreeChat) {
+                FreeChatView()
             }
         }
     }
@@ -214,6 +218,14 @@ struct SceneLibraryView: View {
                     .cornerRadius(8)
                 }
 
+                // 全部按钮
+                CategoryChip(
+                    title: "全部",
+                    isSelected: filterState.selectedCategory == "全部"
+                ) {
+                    filterState.selectedCategory = "全部"
+                }
+
                 // Quick category chips
                 ForEach(categories.filter { $0 != "全部" }, id: \.self) { category in
                     CategoryChip(
@@ -243,9 +255,9 @@ struct SceneLibraryView: View {
                         showNotes = true
                     }
 
-                    // Button 2 - Camera
-                    FloatingActionButton(icon: "sparkles", color: AppTheme.Colors.accent) {
-                        showCamera = true
+                    // Button 2 - Free Chat with AI
+                    FloatingActionButton(icon: "bubble.left.and.bubble.right.fill", color: AppTheme.Colors.accent) {
+                        showFreeChat = true
                     }
                 }
                 .padding(.trailing, 16)

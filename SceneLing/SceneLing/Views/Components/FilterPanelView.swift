@@ -160,6 +160,36 @@ struct FilterPanelView: View {
                     }
                 }
             }
+
+            // 底部按钮
+            HStack(spacing: 12) {
+                // 重置按钮
+                Button {
+                    filterState.reset()
+                } label: {
+                    Text("重置")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(textColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(chipBackground)
+                        .cornerRadius(8)
+                }
+
+                // 确定按钮
+                Button {
+                    onDismiss()
+                } label: {
+                    Text("确定")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(accentColor)
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.top, 8)
         }
         .padding(13)
         .background(Color.white)

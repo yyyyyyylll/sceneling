@@ -100,12 +100,11 @@ async def chat_with_scene_stream(
     history: List[Dict[str, str]]
 ) -> AsyncGenerator[Tuple[str, str], None]:
     """
-    基于场景进行对话 - 稳定输出（服务端一次性生成）
+    基于场景进行对话（服务端一次性生成，非真正流式）
 
     Yields:
         Tuple[str, str]: (event_type, content)
-        - ("text_delta", "部分文字")
-        - ("sentence", "完整句子")  # 用于 TTS
+        - ("final", "完整回复")
         - ("done", "")
         - ("error", "错误信息")
     """
@@ -152,4 +151,78 @@ async def chat_with_scene_stream(
 
     except Exception as e:
         print(f"Stream chat failed: {e}")
+        yield ("error", str(e))
+
+
+# 自由对话系统提示
+FREE_CHAT_SYSTEM_PROMPT = """You are a friendly and patient English learning assistant. Your goal is to help the user practice conversational English in a relaxed, natural way.
+
+## Your Tasks
+1. Have a natural, friendly conversation with the user
+2. Respond only in English; do not include any Chinese translation
+3. Adapt to the user's English level - use simpler words if they seem to struggle
+4. Encourage the user to express more and share their thoughts
+5. Gently correct grammar mistakes when appropriate, by rephrasing naturally
+6. Ask follow-up questions to keep the conversation going
+7. Keep each reply concise (under 80 words) and conversational
+
+## Conversation Style
+- Be warm, encouraging, and supportive
+- Show genuine interest in what the user says
+- Use casual, everyday English
+- Avoid being overly formal or textbook-like
+
+## Response Format
+- English only
+- No translation or explanations in Chinese
+- Natural conversational tone"""
+
+
+async def free_chat_stream(
+    message: str,
+    history: List[Dict[str, str]]
+) -> AsyncGenerator[Tuple[str, str], None]:
+    """
+    自由对话（无场景限制）- 流式
+
+    Yields:
+        Tuple[str, str]: (event_type, content)
+        - ("final", "完整回复")
+        - ("done", "")
+        - ("error", "错误信息")
+    """
+    dashscope.api_key = settings.DASHSCOPE_API_KEY
+
+    messages = [{"role": "system", "content": FREE_CHAT_SYSTEM_PROMPT}]
+
+    for msg in history:
+        role = "user" if msg.get("is_user") else "assistant"
+        messages.append({
+            "role": role,
+            "content": msg.get("content", "")
+        })
+
+    messages.append({
+        "role": "user",
+        "content": message
+    })
+
+    try:
+        response = Generation.call(
+            model="qwen-turbo",
+            messages=messages
+        )
+
+        if response.status_code != 200:
+            yield ("error", f"API error: {response.message}")
+            return
+
+        full_text = getattr(response.output, "text", "") or ""
+        if full_text:
+            yield ("final", full_text)
+
+        yield ("done", "")
+
+    except Exception as e:
+        print(f"Free chat stream failed: {e}")
         yield ("error", str(e))

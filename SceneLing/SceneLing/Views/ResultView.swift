@@ -20,6 +20,10 @@ struct ResultView: View {
     @State private var pendingSceneId = UUID()
     @State private var pendingChatNavigation = false
 
+    // 两阶段加载
+    @State private var isExpressionsLoading = false
+    @State private var sseClient: SSEClient?
+
     var body: some View {
         VStack(spacing: 0) {
             // Photo Preview with category badge
@@ -118,7 +122,7 @@ struct ResultView: View {
                             .tag(0)
                         DescriptionCard(description: result.description)
                             .tag(1)
-                        ExpressionCard(expressions: result.expressions, sceneId: pendingSceneId)
+                        ExpressionCard(expressions: result.expressions, sceneId: pendingSceneId, isLoading: isExpressionsLoading)
                             .tag(2)
                     }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -154,15 +158,22 @@ struct ResultView: View {
                     showRoleSelection = true
                 } label: {
                     HStack {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                        Text("AI对话")
+                        if isExpressionsLoading {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                        }
+                        Text(isExpressionsLoading ? "加载中..." : "AI对话")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(AppTheme.Colors.accent)
+                    .background(isExpressionsLoading ? AppTheme.Colors.accent.opacity(0.5) : AppTheme.Colors.accent)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
+                .disabled(isExpressionsLoading)
             }
             .padding()
         }
@@ -210,20 +221,60 @@ struct ResultView: View {
     private func analyzeImage() async {
         isLoading = true
         errorMessage = nil
+        isExpressionsLoading = true
 
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             errorMessage = "图片处理失败"
             isLoading = false
+            isExpressionsLoading = false
             return
         }
 
-        do {
-            analyzeResult = try await APIService.shared.analyzeImage(imageData)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        // 使用流式 API 进行两阶段加载
+        sseClient = APIService.shared.analyzeImageStream(
+            imageData,
+            cefrLevel: "B1",
+            onEvent: { event in
+                switch event {
+                case .sceneBasic(let data):
+                    // 第一阶段：收到基础信息，立即显示
+                    if let basicResult = SceneAnalyzeBasicResult.fromDict(data) {
+                        self.analyzeResult = SceneAnalyzeResponse.fromBasic(basicResult)
+                        self.isLoading = false
+                    }
 
-        isLoading = false
+                case .sceneExpressions(let data):
+                    // 第二阶段：收到口语例句，更新结果
+                    if let expressionsData = data["expressions"] as? [String: Any],
+                       let expressions = Expressions.fromDict(expressionsData) {
+                        self.analyzeResult?.expressions = expressions
+                    }
+                    self.isExpressionsLoading = false
+
+                case .done:
+                    self.isExpressionsLoading = false
+
+                case .error(let message):
+                    if self.analyzeResult == nil {
+                        // 如果还没有基础结果，显示错误
+                        self.errorMessage = message
+                        self.isLoading = false
+                    }
+                    self.isExpressionsLoading = false
+
+                default:
+                    break
+                }
+            },
+            onComplete: {
+                self.sseClient = nil
+                if self.analyzeResult == nil && self.errorMessage == nil {
+                    self.errorMessage = "分析失败，请重试"
+                    self.isLoading = false
+                }
+                self.isExpressionsLoading = false
+            }
+        )
     }
 
     private func saveScene(_ result: SceneAnalyzeResponse) async {
@@ -488,6 +539,7 @@ struct DescriptionCard: View {
 struct ExpressionCard: View {
     let expressions: Expressions
     let sceneId: UUID?
+    var isLoading: Bool = false
 
     var body: some View {
         ScrollView {
@@ -497,12 +549,40 @@ struct ExpressionCard: View {
                     .foregroundStyle(AppTheme.Colors.textPrimary)
                     .padding(.horizontal)
 
-                LazyVStack(spacing: 16) {
-                    ForEach(expressions.roles, id: \.roleEn) { role in
-                        RoleSection(role: role, sceneId: sceneId)
+                if isLoading {
+                    // 加载中状态
+                    VStack(spacing: 16) {
+                        Spacer()
+                            .frame(height: 40)
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("正在生成口语例句...")
+                            .font(.system(size: 14, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                        Spacer()
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else if expressions.roles.isEmpty {
+                    // 没有内容
+                    VStack(spacing: 12) {
+                        Image(systemName: "text.bubble")
+                            .font(.system(size: 40))
+                            .foregroundStyle(AppTheme.Colors.textSecondary.opacity(0.5))
+                        Text("暂无口语例句")
+                            .font(.system(size: 14, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    LazyVStack(spacing: 16) {
+                        ForEach(expressions.roles, id: \.roleEn) { role in
+                            RoleSection(role: role, sceneId: sceneId)
+                        }
+                    }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
             }
             .padding(.top)
             .padding(.bottom, 20)

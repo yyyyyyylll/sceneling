@@ -31,8 +31,17 @@ class Description(BaseModel):
     cn: str
 
 
+class SceneAnalyzeBasicResponse(BaseModel):
+    """AI 分析返回的基础数据（第一阶段）"""
+    scene_tag: str
+    scene_tag_cn: str
+    object_tags: list[ObjectTag]
+    description: Description
+    category: str
+
+
 class SceneAnalyzeResponse(BaseModel):
-    """AI 分析返回的场景数据"""
+    """AI 分析返回的完整场景数据"""
     scene_tag: str
     scene_tag_cn: str
     object_tags: list[ObjectTag]

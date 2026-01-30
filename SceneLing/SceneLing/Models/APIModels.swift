@@ -49,12 +49,13 @@ struct UserBrief: Codable {
 
 // MARK: - Scene
 
+/// 完整的场景分析响应
 struct SceneAnalyzeResponse: Codable {
     let sceneTag: String
     let sceneTagCn: String
     let objectTags: [ObjectTag]
     let description: Description
-    let expressions: Expressions
+    var expressions: Expressions
     let category: String
 
     enum CodingKeys: String, CodingKey {
@@ -64,6 +65,95 @@ struct SceneAnalyzeResponse: Codable {
         case description
         case expressions
         case category
+    }
+
+    /// 从基础结果创建，表达式为空
+    static func fromBasic(_ basic: SceneAnalyzeBasicResult) -> SceneAnalyzeResponse {
+        SceneAnalyzeResponse(
+            sceneTag: basic.sceneTag,
+            sceneTagCn: basic.sceneTagCn,
+            objectTags: basic.objectTags,
+            description: basic.description,
+            expressions: Expressions(roles: []),
+            category: basic.category
+        )
+    }
+}
+
+/// 第一阶段：基础场景分析结果（不含口语例句）
+struct SceneAnalyzeBasicResult: Codable {
+    let sceneTag: String
+    let sceneTagCn: String
+    let objectTags: [ObjectTag]
+    let description: Description
+    let category: String
+
+    enum CodingKeys: String, CodingKey {
+        case sceneTag = "scene_tag"
+        case sceneTagCn = "scene_tag_cn"
+        case objectTags = "object_tags"
+        case description
+        case category
+    }
+
+    /// 从字典解析
+    static func fromDict(_ dict: [String: Any]) -> SceneAnalyzeBasicResult? {
+        guard let sceneTag = dict["scene_tag"] as? String,
+              let sceneTagCn = dict["scene_tag_cn"] as? String,
+              let category = dict["category"] as? String,
+              let descDict = dict["description"] as? [String: String],
+              let descEn = descDict["en"],
+              let descCn = descDict["cn"],
+              let tagsArray = dict["object_tags"] as? [[String: String]] else {
+            return nil
+        }
+
+        let objectTags = tagsArray.compactMap { tagDict -> ObjectTag? in
+            guard let en = tagDict["en"],
+                  let cn = tagDict["cn"],
+                  let phonetic = tagDict["phonetic"],
+                  let pos = tagDict["pos"] else {
+                return nil
+            }
+            return ObjectTag(en: en, cn: cn, phonetic: phonetic, pos: pos)
+        }
+
+        return SceneAnalyzeBasicResult(
+            sceneTag: sceneTag,
+            sceneTagCn: sceneTagCn,
+            objectTags: objectTags,
+            description: Description(en: descEn, cn: descCn),
+            category: category
+        )
+    }
+}
+
+/// 从字典解析 Expressions
+extension Expressions {
+    static func fromDict(_ dict: [String: Any]) -> Expressions? {
+        guard let rolesArray = dict["roles"] as? [[String: Any]] else {
+            return nil
+        }
+
+        let roles = rolesArray.compactMap { roleDict -> Role? in
+            guard let roleEn = roleDict["role_en"] as? String,
+                  let roleCn = roleDict["role_cn"] as? String,
+                  let sentencesArray = roleDict["sentences"] as? [[String: String]] else {
+                return nil
+            }
+
+            let sentences = sentencesArray.compactMap { sentDict -> Sentence? in
+                guard let en = sentDict["en"],
+                      let cn = sentDict["cn"] else {
+                    return nil
+                }
+                return Sentence(en: en, cn: cn)
+            }
+
+            return Role(roleEn: roleEn, roleCn: roleCn, sentences: sentences)
+        }
+
+        return Expressions(roles: roles)
     }
 }
 
@@ -181,6 +271,11 @@ struct ChatRequest: Codable {
 
 struct ChatResponse: Codable {
     let reply: String
+}
+
+struct FreeChatRequest: Codable {
+    let message: String
+    let history: [ChatMessage]
 }
 
 // MARK: - ASR (语音识别 / 标点分句)

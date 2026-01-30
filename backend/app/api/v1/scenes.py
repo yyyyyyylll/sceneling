@@ -1,13 +1,15 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from typing import Optional
 from uuid import UUID
+import json
 
 from app.api.deps import DBSession, CurrentUser
 from app.models.scene import Scene
 from app.schemas.scene import (
     SceneCreate, SceneResponse, SceneListItem, SceneAnalyzeResponse
 )
-from app.services.qwen_vl import analyze_image
+from app.services.qwen_vl import analyze_image, analyze_image_basic, generate_expressions
 from sqlalchemy import select, desc
 
 router = APIRouter()
@@ -18,7 +20,7 @@ async def analyze_scene(
     image: UploadFile = File(...),
     cefr_level: Optional[str] = "B1"
 ):
-    """上传图片，AI 分析生成学习内容"""
+    """上传图片，AI 分析生成学习内容（完整，一次性返回）"""
     # 验证文件类型
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(
@@ -38,6 +40,88 @@ async def analyze_scene(
         )
 
     return result
+
+
+@router.post("/analyze/stream")
+async def analyze_scene_stream(
+    image: UploadFile = File(...),
+    cefr_level: Optional[str] = "B1"
+):
+    """
+    上传图片，AI 分析生成学习内容（流式，两阶段返回）
+
+    返回 SSE 事件:
+    - {"type": "basic", "data": {...}} - 第一阶段：基础信息（场景、词汇、描述）
+    - {"type": "expressions", "data": {...}} - 第二阶段：口语例句
+    - {"type": "done"} - 完成
+    - {"type": "error", "message": "..."} - 错误
+    """
+    # 验证文件类型
+    if not image.content_type or not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="只支持图片文件"
+        )
+
+    # 读取图片内容
+    image_data = await image.read()
+
+    async def event_generator():
+        try:
+            # 第一阶段：分析基础信息
+            basic_result = await analyze_image_basic(image_data, cefr_level)
+
+            if not basic_result:
+                error_data = json.dumps({
+                    "type": "error",
+                    "message": "图片分析失败，请重试"
+                }, ensure_ascii=False)
+                yield f"data: {error_data}\n\n"
+                return
+
+            # 发送基础信息
+            basic_data = json.dumps({
+                "type": "basic",
+                "data": basic_result
+            }, ensure_ascii=False)
+            yield f"data: {basic_data}\n\n"
+
+            # 第二阶段：生成口语例句（使用纯文本模型，更快）
+            expressions_result = await generate_expressions(
+                scene_tag=basic_result.get("scene_tag", ""),
+                scene_tag_cn=basic_result.get("scene_tag_cn", ""),
+                category=basic_result.get("category", ""),
+                description_en=basic_result.get("description", {}).get("en", ""),
+                cefr_level=cefr_level
+            )
+
+            if expressions_result:
+                expressions_data = json.dumps({
+                    "type": "expressions",
+                    "data": {"expressions": expressions_result}
+                }, ensure_ascii=False)
+                yield f"data: {expressions_data}\n\n"
+
+            # 完成
+            done_data = json.dumps({"type": "done"})
+            yield f"data: {done_data}\n\n"
+
+        except Exception as e:
+            error_data = json.dumps({
+                "type": "error",
+                "message": str(e)
+            }, ensure_ascii=False)
+            yield f"data: {error_data}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @router.post("", response_model=SceneResponse, status_code=status.HTTP_201_CREATED)
