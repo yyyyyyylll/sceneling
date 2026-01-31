@@ -16,7 +16,8 @@ struct SceneLibraryView: View {
     private let categories = ["全部", "日常", "学习", "旅行", "购物", "美食", "其他"]
 
     private var filteredScenes: [LocalScene] {
-        var result = scenes
+        // 只显示保存到场景库的场景
+        var result = scenes.filter { $0.isSavedToLibrary }
 
         // 分类筛选
         if filterState.selectedCategory != "全部" {
@@ -58,7 +59,7 @@ struct SceneLibraryView: View {
                 AppTheme.Colors.background
                     .ignoresSafeArea()
 
-                if scenes.isEmpty {
+                if filteredScenes.isEmpty && searchText.isEmpty && filterState.selectedCategory == "全部" && !filterState.hasActiveFilters {
                     emptyStateView
                 } else {
                     contentView

@@ -12,6 +12,7 @@ class LocalChatMessage: Identifiable, ObservableObject {
     var recordedAudioData: Data?  // 缓存录音数据 (用户消息)
     @Published var translation: String?  // 中文翻译
     @Published var showTranslation: Bool = false
+    @Published var isLoadingInitialAudio: Bool = false  // 首条消息音频加载状态
 
     init(content: String, isUser: Bool, roleName: String = "", recordedAudioData: Data? = nil) {
         self.content = content

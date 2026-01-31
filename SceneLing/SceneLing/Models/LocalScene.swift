@@ -16,7 +16,8 @@ final class LocalScene {
     var category: String
     var createdAt: Date
     var isSynced: Bool
-    var dialogueCount: Int  // 对话次数
+    var dialogueCount: Int = 0  // 对话次数
+    var isSavedToLibrary: Bool = false  // 是否保存到场景库
 
     init(
         id: UUID = UUID(),
@@ -32,7 +33,8 @@ final class LocalScene {
         category: String,
         createdAt: Date = Date(),
         isSynced: Bool = false,
-        dialogueCount: Int = 0
+        dialogueCount: Int = 0,
+        isSavedToLibrary: Bool = false
     ) {
         self.id = id
         self.serverId = serverId
@@ -48,6 +50,7 @@ final class LocalScene {
         self.createdAt = createdAt
         self.isSynced = isSynced
         self.dialogueCount = dialogueCount
+        self.isSavedToLibrary = isSavedToLibrary
     }
 
     /// 增加对话次数

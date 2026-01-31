@@ -13,6 +13,8 @@ struct ResultView: View {
     @State private var selectedTab = 0
     @State private var isSaving = false
     @State private var showSaveSuccess = false
+    @State private var currentScene: LocalScene?  // 当前保存的场景记录
+    @State private var isSavedToLibrary = false  // 是否已保存到场景库
     @State private var showRoleSelection = false
     @State private var showChat = false
     @State private var selectedUserRole: Role?
@@ -140,18 +142,20 @@ struct ResultView: View {
                         if isSaving {
                             ProgressView()
                                 .tint(.white)
+                        } else if isSavedToLibrary {
+                            Image(systemName: "checkmark")
                         } else {
                             Image(systemName: "square.and.arrow.down")
                         }
-                        Text("保存到场景库")
+                        Text(isSavedToLibrary ? "已保存" : "保存到场景库")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(AppTheme.Colors.secondary)
+                    .background(isSavedToLibrary ? AppTheme.Colors.secondary.opacity(0.5) : AppTheme.Colors.secondary)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .disabled(isSaving)
+                .disabled(isSaving || isSavedToLibrary)
 
                 // AI Chat Button
                 Button {
@@ -241,6 +245,8 @@ struct ResultView: View {
                     if let basicResult = SceneAnalyzeBasicResult.fromDict(data) {
                         self.analyzeResult = SceneAnalyzeResponse.fromBasic(basicResult)
                         self.isLoading = false
+                        // 自动保存到最近学习
+                        self.autoSaveToRecentLearning(SceneAnalyzeResponse.fromBasic(basicResult))
                     }
 
                 case .sceneExpressions(let data):
@@ -248,6 +254,8 @@ struct ResultView: View {
                     if let expressionsData = data["expressions"] as? [String: Any],
                        let expressions = Expressions.fromDict(expressionsData) {
                         self.analyzeResult?.expressions = expressions
+                        // 更新已保存场景的口语例句
+                        self.currentScene?.expressions = expressions
                     }
                     self.isExpressionsLoading = false
 
@@ -277,9 +285,8 @@ struct ResultView: View {
         )
     }
 
-    private func saveScene(_ result: SceneAnalyzeResponse) async {
-        isSaving = true
-
+    /// 自动保存到最近学习（不保存到场景库）
+    private func autoSaveToRecentLearning(_ result: SceneAnalyzeResponse) {
         let scene = LocalScene(
             id: pendingSceneId,
             localPhotoId: pendingSceneId.uuidString,
@@ -290,16 +297,60 @@ struct ResultView: View {
             descriptionEn: result.description.en,
             descriptionCn: result.description.cn,
             expressions: result.expressions,
-            category: result.category
+            category: result.category,
+            isSavedToLibrary: false  // 只保存到最近学习，不保存到场景库
         )
 
         modelContext.insert(scene)
+        currentScene = scene
 
         do {
             try modelContext.save()
-            showSaveSuccess = true
         } catch {
-            errorMessage = "保存失败：\(error.localizedDescription)"
+            print("自动保存失败：\(error.localizedDescription)")
+        }
+    }
+
+    /// 保存到场景库
+    private func saveScene(_ result: SceneAnalyzeResponse) async {
+        isSaving = true
+
+        // 更新已有记录的 isSavedToLibrary 标记
+        if let scene = currentScene {
+            scene.isSavedToLibrary = true
+            do {
+                try modelContext.save()
+                isSavedToLibrary = true
+                showSaveSuccess = true
+            } catch {
+                errorMessage = "保存失败：\(error.localizedDescription)"
+            }
+        } else {
+            // 如果没有已保存的记录，创建新记录
+            let scene = LocalScene(
+                id: pendingSceneId,
+                localPhotoId: pendingSceneId.uuidString,
+                photoData: image.jpegData(compressionQuality: 0.8),
+                sceneTag: result.sceneTag,
+                sceneTagCn: result.sceneTagCn,
+                objectTags: result.objectTags,
+                descriptionEn: result.description.en,
+                descriptionCn: result.description.cn,
+                expressions: result.expressions,
+                category: result.category,
+                isSavedToLibrary: true
+            )
+
+            modelContext.insert(scene)
+            currentScene = scene
+
+            do {
+                try modelContext.save()
+                isSavedToLibrary = true
+                showSaveSuccess = true
+            } catch {
+                errorMessage = "保存失败：\(error.localizedDescription)"
+            }
         }
 
         isSaving = false

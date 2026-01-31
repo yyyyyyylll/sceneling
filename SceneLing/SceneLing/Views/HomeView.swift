@@ -158,17 +158,23 @@ struct HomeView: View {
         }
     }
 
+    /// 只显示7天内的场景
     private var groupedScenes: [(String, [LocalScene])] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today)!
 
         var todayScenes: [LocalScene] = []
         var yesterdayScenes: [LocalScene] = []
         var olderScenes: [LocalScene] = []
 
-        for scene in recentScenes.prefix(10) {
+        // 只显示7天内的场景
+        for scene in recentScenes {
             let sceneDate = calendar.startOfDay(for: scene.createdAt)
+            // 超过7天的不显示
+            guard sceneDate >= sevenDaysAgo else { continue }
+
             if sceneDate == today {
                 todayScenes.append(scene)
             } else if sceneDate == yesterday {

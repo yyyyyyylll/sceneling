@@ -213,8 +213,34 @@ struct FreeChatView: View {
     private func sendInitialMessage() {
         guard messages.isEmpty else { return }
         let greeting = "Hi there! I'm your English learning buddy. Feel free to talk to me about anything - your day, your hobbies, or whatever's on your mind. What would you like to chat about today?"
+        let translation = "嗨！我是你的英语学习伙伴。你可以随意和我聊任何话题——你的一天、你的爱好或者任何你想聊的事情。今天你想聊点什么呢？"
         let message = LocalChatMessage(content: greeting, isUser: false, roleName: "AI")
+        message.translation = translation
         messages.append(message)
+
+        // 自动加载并播放首条消息的语音
+        loadAndPlayInitialAudio(for: message)
+    }
+
+    private func loadAndPlayInitialAudio(for message: LocalChatMessage) {
+        message.isLoadingInitialAudio = true
+        Task {
+            do {
+                let audioDataURL = try await APIService.shared.textToSpeechDataURL(text: message.content, voice: "en-US-female")
+                await MainActor.run {
+                    message.cachedAudioURL = audioDataURL
+                    message.isLoadingInitialAudio = false
+                    if self.enableTTS {
+                        self.audioPlayer.enqueue(dataURL: audioDataURL)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    message.isLoadingInitialAudio = false
+                }
+                print("Failed to load initial audio: \(error)")
+            }
+        }
     }
 
     private func sendMessage() {
@@ -386,7 +412,7 @@ struct FreeMessageBubble: View {
                 Button {
                     playAudio()
                 } label: {
-                    if isLoadingAudio {
+                    if isLoadingAudio || message.isLoadingInitialAudio {
                         ProgressView()
                             .scaleEffect(0.6)
                             .frame(width: 24, height: 24)
@@ -399,7 +425,7 @@ struct FreeMessageBubble: View {
                             .clipShape(Circle())
                     }
                 }
-                .disabled(isLoadingAudio)
+                .disabled(isLoadingAudio || message.isLoadingInitialAudio)
 
                 Button {
                     message.showTranslation.toggle()

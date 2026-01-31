@@ -1143,10 +1143,9 @@ Content-Type: multipart/form-data
 
 ## 七、埋点需求
 
-> **优先级说明**
-> - **P0**：核心漏斗指标，MVP 必须埋点
-> - **P1**：重要行为分析，建议 MVP 包含
-> - **P2**：精细化运营，可后续迭代添加
+> **设计原则**：MVP 阶段只追踪核心漏斗关键节点，验证业务假设。其他埋点等有具体分析需求再加。
+
+---
 
 ### 7.1 埋点公共参数
 
@@ -1154,262 +1153,171 @@ Content-Type: multipart/form-data
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| user_id | String | 用户 ID（登录后） |
-| device_id | String | 设备唯一标识 |
+| user_id | String | 用户 ID |
+| device_id | String | 设备唯一标识（IDFV） |
 | session_id | String | 会话 ID（每次启动生成） |
 | timestamp | Long | 事件时间戳（毫秒） |
 | app_version | String | App 版本号 |
 | os_version | String | iOS 系统版本 |
-| network_type | String | 网络类型（WiFi/4G/5G/None） |
-| is_first_day | Boolean | 是否新用户首日 |
 
 ---
 
-### 7.2 V1.0 埋点事件详情
+### 7.2 模块一：拍照学习漏斗（9 个埋点）
 
-#### 7.2.1 应用生命周期
+> **验证假设**：用户是否愿意通过拍照学习英语？
 
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `app_launch` | P0 | App 启动完成 | `launch_type`(cold/warm), `launch_duration_ms` |
-| `app_enter_foreground` | P1 | 从后台切回前台 | `background_duration_ms` |
-| `app_enter_background` | P1 | 切到后台 | `session_duration_ms` |
+**漏斗路径**：
+```
+启动 → 点击拍照 → 完成选图 → 分析成功 → 保存场景
+```
 
-#### 7.2.2 用户认证
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `login_page_view` | P0 | 登录页曝光 | `source`(launch/logout) |
-| `login_click` | P0 | 点击登录按钮 | - |
-| `login_success` | P0 | 登录成功 | `is_new_user` |
-| `login_fail` | P0 | 登录失败 | `error_code`, `error_msg` |
-| `logout_click` | P1 | 点击退出登录 | - |
-
-#### 7.2.3 页面浏览（PV）
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `page_view` | P0 | 页面曝光 | `page_name`, `from_page`, `stay_duration_ms`(离开时补充) |
-
-**page_name 枚举值**：
-- `home` - 首页
-- `camera` - 拍照页
-- `result` - 识别结果页
-- `scene_library` - 场景库
-- `scene_detail` - 场景详情
-- `my_notes` - 我的笔记
-- `note_detail` - 笔记详情
-- `profile` - 个人中心
-- `community` - 社区（占位）
-- `settings` - 设置
-
-#### 7.2.4 核心功能：拍照识别
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `camera_click` | P0 | 点击拍照入口 | `source`(home_button/home_recent/scene_library/tab) |
-| `photo_take` | P0 | 完成拍照 | `use_flash`, `camera_position`(front/back) |
-| `photo_upload` | P0 | 从相册选择 | - |
-| `photo_cancel` | P1 | 放弃拍照/选择 | `stage`(camera/album) |
-| `permission_request` | P1 | 请求权限 | `permission_type`(camera/photo_library) |
-| `permission_result` | P1 | 权限结果 | `permission_type`, `granted` |
-
-#### 7.2.5 核心功能：AI 内容生成
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `analyze_start` | P0 | 开始识别 | - |
-| `analyze_success` | P0 | 识别成功 | `duration_ms`, `scene_tag`, `vocab_count` |
-| `analyze_fail` | P0 | 识别失败 | `error_code`, `error_msg`, `duration_ms` |
-| `card_switch` | P0 | 切换卡片Tab | `from_tab`, `to_tab`(vocabulary/description/expression) |
-| `card_view_duration` | P1 | 卡片停留时长 | `tab`, `duration_ms` |
-
-#### 7.2.6 核心功能：TTS 发音
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `tts_play` | P0 | 点击发音 | `content_type`(word/description/expression), `content_id` |
-| `tts_complete` | P1 | 播放完成 | `content_type`, `duration_ms` |
-| `tts_stop` | P2 | 手动停止 | `content_type`, `played_duration_ms` |
-| `tts_fail` | P1 | 播放失败 | `error_code` |
-
-#### 7.2.7 核心功能：保存
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `save_click` | P0 | 点击保存 | - |
-| `save_success` | P0 | 保存成功 | `scene_id`, `vocab_count`, `expression_count` |
-| `save_fail` | P0 | 保存失败 | `error_code` |
-| `save_duplicate` | P2 | 重复保存 | `scene_id` |
-
-#### 7.2.8 我的笔记
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `notes_filter` | P1 | 切换筛选 | `filter_type`(all/vocabulary/expression) |
-| `notes_search` | P1 | 使用搜索 | `keyword_length` |
-| `note_click` | P0 | 点击笔记条目 | `note_type`, `note_id` |
-| `note_tts_play` | P1 | 笔记列表发音 | `note_id` |
-
-#### 7.2.9 场景库
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `scene_filter` | P1 | 切换分类筛选 | `category`(all/daily/study/travel/shopping/other) |
-| `scene_search` | P1 | 使用搜索 | `keyword_length` |
-| `scene_click` | P0 | 点击场景卡片 | `scene_id`, `scene_tag` |
-| `scene_detail_card_switch` | P1 | 详情页切换卡片 | `scene_id`, `to_tab` |
-| `ai_dialog_click` | P2 | 点击 AI 对话按钮 | `scene_id`（V1.0 仅统计点击） |
-
-#### 7.2.10 个人中心
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `profile_notes_click` | P1 | 点击我的笔记入口 | - |
-| `profile_settings_click` | P2 | 点击学习设置 | - |
-| `profile_about_click` | P2 | 点击关于我们 | - |
+| # | 事件名 | 触发时机 | 核心参数 | 追踪目的 |
+|---|--------|----------|----------|----------|
+| 1 | `app_launch` | App 启动完成 | `is_first_launch` | DAU、新用户识别 |
+| 2 | `login_result` | 登录流程结束 | `success`, `is_new_user`, `error_code` | 登录转化 |
+| 3 | `photo_click` | 点击拍照学习按钮 | - | 拍照意愿 |
+| 4 | `photo_complete` | 完成选图 | `source`(camera/album) | 选图完成率 |
+| 5 | `analyze_result` | 分析结束 | `success`, `duration_ms`, `scene_tag`, `error_code` | 分析成功率 |
+| 6 | `tts_play` | 点击播放语音 | `type`(word/description/expression) | 发音学习行为 |
+| 7 | `scene_save` | 保存场景到库 | `scene_id`, `scene_tag` | 场景保存率 |
+| 8 | `note_save` | 保存笔记 | `type`(vocabulary/expression) | 笔记保存行为 |
+| 9 | `result_close` | 关闭结果页 | `stay_duration_ms`, `saved_scene`, `saved_note_count` | 内容吸引度 |
 
 ---
 
-### 7.3 V1.1 新增埋点事件
+### 7.3 模块二：AI 对话漏斗（7 个埋点）
 
-#### 7.3.1 AI 对话
+> **验证假设**：用户是否愿意用 AI 进行对话练习？
 
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `dialog_role_view` | P0 | 角色选择页曝光 | `scene_id` |
-| `dialog_role_select` | P0 | 选择角色 | `user_role`, `ai_role`, `scene_id` |
-| `dialog_start` | P0 | 开始对话 | `scene_id`, `user_role`, `ai_role` |
-| `dialog_message_send` | P0 | 发送消息 | `input_type`(text/voice), `message_length`, `turn_number` |
-| `dialog_message_receive` | P0 | 收到 AI 回复 | `response_time_ms`, `turn_number` |
-| `dialog_tts_play` | P1 | 播放 AI 回复 | `turn_number` |
-| `dialog_hint_use` | P1 | 使用提示 | `hint_type`(sentence/word), `turn_number` |
-| `dialog_translate_click` | P1 | 点击翻译 | `turn_number` |
-| `dialog_end` | P0 | 结束对话 | `total_turns`, `duration_ms`, `end_type`(normal/cancel) |
+**漏斗路径**：
+```
+点击对话 → 选择角色 → 开始对话 → 发送消息 → 结束对话
+```
 
-#### 7.3.2 语音输入
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `asr_start` | P0 | 开始语音识别 | - |
-| `asr_success` | P0 | 识别成功 | `duration_ms`, `text_length` |
-| `asr_fail` | P0 | 识别失败 | `error_code`, `duration_ms` |
-| `asr_cancel` | P1 | 取消识别 | `duration_ms` |
-
-#### 7.3.3 对话报告
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `report_view` | P0 | 报告页曝光 | `scene_id`, `total_score` |
-| `report_view_history` | P1 | 查看对话记录 | `scene_id` |
-| `report_retry` | P1 | 再练一次 | `scene_id` |
-
-#### 7.3.4 难度设置
-
-| 事件名 | 优先级 | 触发时机 | 事件参数 |
-|--------|--------|----------|----------|
-| `difficulty_change` | P0 | 修改难度等级 | `from_level`, `to_level`(A2/B1/B2) |
+| # | 事件名 | 触发时机 | 核心参数 | 追踪目的 |
+|---|--------|----------|----------|----------|
+| 1 | `dialog_click` | 点击进入对话 | `source`(result/scene_detail/scene_card) | 对话意愿 |
+| 2 | `dialog_start` | 点击「开始对话」 | `scene_id`, `user_role`, `ai_role` | 角色选择完成率 |
+| 3 | `message_send` | 发送消息 | `input_type`(text/voice), `turn_number` | 对话参与度 |
+| 4 | `message_result` | AI 回复结束 | `success`, `response_ms`, `turn_number`, `error_code` | AI 响应质量 |
+| 5 | `voice_result` | 语音输入结束 | `success`, `duration_ms`, `error_code` | 语音识别成功率 |
+| 6 | `audio_play` | 点击播放音频 | `type`(ai/user) | 听力学习行为 |
+| 7 | `dialog_end` | 对话结束 | `total_turns`, `duration_ms`, `voice_count`, `text_count` | 对话深度 |
 
 ---
 
-### 7.4 核心业务指标计算
+### 7.4 留存追踪（1 个埋点）
 
-#### V1.0 核心漏斗
-
-```
-用户启动 → 点击拍照 → 完成拍照 → 识别成功 → 保存场景
-   ↓           ↓           ↓           ↓          ↓
-app_launch  camera_click  photo_take  analyze_success  save_success
-```
-
-| 指标 | 计算公式 | 目标值 |
-|------|----------|--------|
-| **DAU** | COUNT(DISTINCT user_id) WHERE app_launch | - |
-| **拍照转化率** | camera_click UV / app_launch UV | ≥30% |
-| **拍照完成率** | photo_take UV / camera_click UV | ≥80% |
-| **识别成功率** | analyze_success / (analyze_success + analyze_fail) | ≥95% |
-| **保存率** | save_success UV / analyze_success UV | ≥50% |
-| **次日留存** | 次日 app_launch UV / 首日新用户 UV | ≥40% |
-| **7日留存** | 7日内 app_launch UV / 首日新用户 UV | ≥20% |
-
-#### V1.1 对话漏斗
-
-```
-场景详情 → 点击对话 → 选择角色 → 开始对话 → 完成对话
-    ↓          ↓          ↓          ↓          ↓
-scene_detail  ai_dialog  dialog_role  dialog_start  dialog_end
-```
-
-| 指标 | 计算公式 | 目标值 |
-|------|----------|--------|
-| **对话发起率** | dialog_start UV / scene_detail UV | ≥20% |
-| **对话完成率** | dialog_end(normal) / dialog_start | ≥60% |
-| **平均对话轮数** | AVG(total_turns) | ≥5轮 |
-| **语音输入率** | asr_start UV / dialog_start UV | ≥30% |
+| # | 事件名 | 触发时机 | 核心参数 | 追踪目的 |
+|---|--------|----------|----------|----------|
+| 1 | `session_end` | App 进入后台 | `session_duration_ms`, `scene_count`, `dialog_count` | 单次使用深度 |
 
 ---
 
-### 7.5 埋点优先级汇总
+### 7.5 埋点汇总
 
-| 优先级 | 事件数量 | 说明 |
+| 模块 | 埋点数 |
+|------|--------|
+| 拍照学习漏斗 | 9 |
+| AI 对话漏斗 | 7 |
+| 留存追踪 | 1 |
+| **合计** | **17** |
+
+---
+
+### 7.6 核心业务指标
+
+#### 7.6.1 模块一：拍照学习
+
+**北极星指标**
+
+| 指标 | 定义 | 计算公式 | 目标 |
+|------|------|----------|------|
+| **日均有效学习数** | 每 DAU 每天完成的有效学习次数 | analyze_result(success) 次数 / DAU | ≥ 2 |
+
+**北极星拆解**
+
+```
+日均有效学习数 = 拍照意愿 × 选图完成率 × 分析成功率 × 日均使用次数
+```
+
+| 子指标 | 计算公式 | 目标 |
 |--------|----------|------|
-| **P0** | ~25 | 核心漏斗必须，缺失无法分析转化 |
-| **P1** | ~20 | 行为分析需要，帮助理解用户习惯 |
-| **P2** | ~10 | 精细优化使用，可后续补充 |
+| 拍照意愿 | photo_click UV / app_launch UV | ≥ 40% |
+| 选图完成率 | photo_complete UV / photo_click UV | ≥ 75% |
+| 分析成功率 | analyze_result(success) / analyze_result | ≥ 95% |
+| TTS 使用率 | tts_play UV / analyze_result(success) UV | ≥ 30% |
+| 场景保存率 | scene_save UV / analyze_result(success) UV | ≥ 40% |
+| 有效浏览率 | result_close(stay≥30s) / analyze_result(success) | ≥ 60% |
 
-**开发建议**
-- **第一阶段**：实现所有 P0 埋点，确保核心漏斗可追踪
-- **第二阶段**：补充 P1 埋点，完善行为分析
-- **第三阶段**：根据运营需求添加 P2 埋点
+**核心漏斗**
+
+```
+app_launch → photo_click → photo_complete → analyze_result(ok) → scene_save
+   100%    →    40%      →      30%       →        29%         →    12%
+```
+
+---
+
+#### 7.6.2 模块二：AI 对话
+
+**北极星指标**
+
+| 指标 | 定义 | 计算公式 | 目标 |
+|------|------|----------|------|
+| **日均有效对话轮数** | 每 DAU 每天完成的对话轮数 | SUM(dialog_end.total_turns where turns≥3) / DAU | ≥ 6 轮 |
+
+**北极星拆解**
+
+```
+日均有效对话轮数 = 对话发起率 × 角色确认率 × 平均轮数 × 完成率
+```
+
+| 子指标 | 计算公式 | 目标 |
+|--------|----------|------|
+| 对话发起率 | dialog_click UV / 可进入对话页面 UV | ≥ 25% |
+| 角色确认率 | dialog_start UV / dialog_click UV | ≥ 70% |
+| 平均对话轮数 | AVG(dialog_end.total_turns) | ≥ 5 轮 |
+| 对话完成率 | dialog_end(turns≥3) / dialog_start | ≥ 60% |
+| 语音使用率 | message_send(voice) UV / dialog_start UV | ≥ 30% |
+
+**核心漏斗**
+
+```
+dialog_click → dialog_start → message_send → dialog_end(≥3轮)
+    100%     →     70%      →     65%      →      45%
+```
+
+---
+
+#### 7.6.3 整体健康指标
+
+| 指标 | 计算公式 | 目标 |
+|------|----------|------|
+| DAU | COUNT(DISTINCT user_id) WHERE app_launch | - |
+| 次日留存 | D+1 launch UV / D0 新用户 | ≥ 40% |
+| 7日留存 | D+7 launch UV / D0 新用户 | ≥ 20% |
+| 日均使用时长 | AVG(session_end.session_duration_ms) | ≥ 5min |
+
+---
+
+### 7.7 后续迭代可加埋点
+
+以下埋点在 MVP 阶段**不需要**，等有具体分析需求再加：
+
+| 分析需求 | 可加埋点 | 触发条件 |
+|----------|----------|----------|
+| 内容偏好分析 | `tab_switch` | 发现用户只看某个 Tab |
+| 翻译依赖分析 | `translation_show` | 想了解翻译使用程度 |
+| 筛选/搜索分析 | `filter_apply`, `search` | 场景库数据量大后 |
+| 错误详情追踪 | 细分 `_fail` 事件 | 某功能失败率异常时 |
+| 页面停留分析 | `page_view` + `page_leave` | 需要分析页面流失时 |
 
 ---
 
 ## 八、附录
 
-### 8.1 千问VL Prompt 模板
-
-```
-你是一个专业的英语学习助手。请分析用户上传的照片，并生成英语学习内容。
-
-## 任务要求
-
-1. **场景识别**：识别照片中的核心场景，输出1个场景标签
-2. **物品识别**：识别场景中2-5个关键物品
-3. **场景描述**：用英语描述照片内容，不超过50个单词，并提供中文翻译
-4. **口语例句**：根据场景推断4个典型角色，每个角色生成2句在此场景下常用的口语表达
-
-## 难度要求
-请使用 [CEFR等级] 水平的词汇和句型。
-
-## 输出格式
-请严格按照以下 JSON 格式输出：
-
-{
-  "scene_tag": "场景英文标签",
-  "scene_tag_cn": "场景中文标签",
-  "object_tags": [
-    {"en": "英文", "cn": "中文", "phonetic": "音标", "pos": "词性"}
-  ],
-  "description": {
-    "en": "英文描述",
-    "cn": "中文描述"
-  },
-  "expressions": {
-    "roles": [
-      {
-        "role_en": "角色英文名",
-        "role_cn": "角色中文名",
-        "sentences": [
-          {"en": "英文例句", "cn": "中文翻译"}
-        ]
-      }
-    ]
-  },
-  "category": "分类（学习/生活/旅行/美食/其他）"
-}
-```
-
-### 8.2 未来版本规划
+### 8.1 未来版本规划
 
 | 版本 | 主要功能 | 目标 |
 |------|----------|------|
@@ -1425,7 +1333,7 @@ scene_detail  ai_dialog  dialog_role  dialog_start  dialog_end
 - 提供话题建议：My hobbies, Travel plans, Daily routine, Favorite movies 等
 - 支持语音输入和文字输入
 
-### 8.3 设计规范参考
+### 8.2 设计规范参考
 
 - 界面风格：简洁、学习沉浸、轻操作
 - 参考产品：Notion + Duolingo
