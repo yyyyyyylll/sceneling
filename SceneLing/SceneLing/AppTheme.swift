@@ -2,26 +2,41 @@ import SwiftUI
 
 struct AppTheme {
     struct Colors {
-        // Figma Design Palette - Pink Theme
-        static let primary = Color(red: 0.60, green: 0.06, blue: 0.98) // Purple accent
-        static let secondary = Color(red: 0.68, green: 0.28, blue: 1) // Light purple
-        static let accent = Color(red: 0.99, green: 0.39, blue: 0.71) // Pink
-        static let background = Color(red: 0.99, green: 0.95, blue: 0.97) // Light pink background
-        static let surface = Color.white.opacity(0.80) // Semi-transparent white
-        static let surfaceSolid = Color.white
+        // Warm Coral Theme
+        static let primary100 = Color(hex: "FF7F50") // Coral orange
+        static let primary200 = Color(hex: "dd6236") // Darker orange
+        static let primary300 = Color(hex: "8f1e00") // Dark red/brown
 
-        static let textPrimary = Color(red: 0.04, green: 0.04, blue: 0.04) // Near black
-        static let textSecondary = Color(red: 0.44, green: 0.44, blue: 0.51) // Gray
+        static let accent100 = Color(hex: "8B4513") // Saddle brown
+        static let accent200 = Color(hex: "ffd299") // Light peach
+
+        static let text100 = Color(hex: "000000") // Black
+        static let text200 = Color(hex: "2c2c2c") // Dark gray
+
+        static let bg100 = Color(hex: "F7EEDD") // Cream/beige
+        static let bg200 = Color(hex: "ede4d3") // Slightly darker cream
+        static let bg300 = Color(hex: "c4bcab") // Grayish beige
+
+        // Convenience aliases for backward compatibility
+        static let primary = primary100
+        static let secondary = primary200
+        static let accent = accent100
+        static let background = bg100
+        static let surface = bg200.opacity(0.80)
+        static let surfaceSolid = bg200
+
+        static let textPrimary = text100
+        static let textSecondary = text200
 
         struct Pastels {
-            static let pink = Color(red: 0.99, green: 0.39, blue: 0.71)
-            static let blue = Color(red: 0.32, green: 0.64, blue: 1)
-            static let purple = Color(red: 0.76, green: 0.48, blue: 1)
-            static let yellow = Color(hex: "FDFD96")
+            static let coral = Color(hex: "FF7F50")
+            static let peach = Color(hex: "ffd299")
+            static let cream = Color(hex: "F7EEDD")
+            static let brown = Color(hex: "8B4513")
         }
 
         // Shadow colors
-        static let buttonShadow = Color(red: 0.85, green: 0.70, blue: 1).opacity(0.50)
+        static let buttonShadow = primary200.opacity(0.40)
         static let cardShadow = Color.black.opacity(0.10)
     }
     
@@ -96,6 +111,6 @@ extension Font {
     }
     
     static func appCaption() -> Font {
-        .system(size: 12, weight: .medium, design: .rounded) // Was 13
+        .system(size: 14, weight: .medium, design: .rounded)
     }
 }

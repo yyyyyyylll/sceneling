@@ -1,16 +1,25 @@
 import SwiftUI
+import SwiftData
 import UIKit
 
 struct SceneDetailView: View {
     let scene: LocalScene
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedTab = 0
     @State private var showRoleSelection = false
     @State private var showChat = false
     @State private var selectedUserRole: Role?
     @State private var selectedAIRole: Role?
-    @State private var showSaveSuccess = false
+    @State private var isSavedToLibrary: Bool
+    @State private var isSaving = false
     @State private var pendingChatNavigation = false
+    @State private var chatStartTime: Date?  // 对话开始时间
+
+    init(scene: LocalScene) {
+        self.scene = scene
+        self._isSavedToLibrary = State(initialValue: scene.isSavedToLibrary)
+    }
 
     // 从 LocalScene 转换为 SceneAnalyzeResponse 用于 ChatView
     private var sceneContext: SceneAnalyzeResponse {
@@ -75,20 +84,34 @@ struct SceneDetailView: View {
 
             // Bottom Buttons
             HStack(spacing: 12) {
-                // 已保存状态按钮
+                // Save Button - 可切换保存/取消保存状态
                 Button {
-                    showSaveSuccess = true
+                    Task {
+                        if isSavedToLibrary {
+                            await unsaveScene()
+                        } else {
+                            await saveScene()
+                        }
+                    }
                 } label: {
                     HStack {
-                        Image(systemName: "checkmark.circle")
-                        Text("已保存")
+                        if isSaving {
+                            ProgressView()
+                                .tint(.white)
+                        } else if isSavedToLibrary {
+                            Image(systemName: "checkmark.circle.fill")
+                        } else {
+                            Image(systemName: "square.and.arrow.down")
+                        }
+                        Text(isSavedToLibrary ? "已保存场景" : "保存场景")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(AppTheme.Colors.secondary)
+                    .background(isSavedToLibrary ? AppTheme.Colors.secondary : AppTheme.Colors.secondary.opacity(0.7))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
+                .disabled(isSaving)
 
                 // AI对话按钮
                 Button {
@@ -138,6 +161,9 @@ struct SceneDetailView: View {
         .fullScreenCover(isPresented: $showChat) {
             if let userRole = selectedUserRole, let aiRole = selectedAIRole {
                 ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole, photoData: scene.photoData, isPresented: $showChat)
+                    .onAppear {
+                        chatStartTime = Date()
+                    }
             } else {
                 // Fallback - should not happen, but prevents blank screen
                 Text("加载中...")
@@ -149,9 +175,44 @@ struct SceneDetailView: View {
                     }
             }
         }
-        .alert("已保存到场景库", isPresented: $showSaveSuccess) {
-            Button("好的") {}
+        .onChange(of: showChat) { oldValue, newValue in
+            // 对话结束时记录时长和对话次数
+            if oldValue == true && newValue == false {
+                if let startTime = chatStartTime {
+                    let duration = Int(Date().timeIntervalSince(startTime))
+                    scene.addDialogueDuration(duration)
+                    scene.incrementDialogueCount()
+                    try? modelContext.save()
+                    chatStartTime = nil
+                }
+            }
         }
+    }
+
+    /// 保存到场景库
+    private func saveScene() async {
+        isSaving = true
+        scene.isSavedToLibrary = true
+        do {
+            try modelContext.save()
+            isSavedToLibrary = true
+        } catch {
+            print("保存失败：\(error.localizedDescription)")
+        }
+        isSaving = false
+    }
+
+    /// 从场景库取消保存
+    private func unsaveScene() async {
+        isSaving = true
+        scene.isSavedToLibrary = false
+        do {
+            try modelContext.save()
+            isSavedToLibrary = false
+        } catch {
+            print("取消保存失败：\(error.localizedDescription)")
+        }
+        isSaving = false
     }
 }
 

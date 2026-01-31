@@ -12,7 +12,6 @@ struct ResultView: View {
     @State private var analyzeResult: SceneAnalyzeResponse?
     @State private var selectedTab = 0
     @State private var isSaving = false
-    @State private var showSaveSuccess = false
     @State private var currentScene: LocalScene?  // 当前保存的场景记录
     @State private var isSavedToLibrary = false  // 是否已保存到场景库
     @State private var showRoleSelection = false
@@ -21,6 +20,7 @@ struct ResultView: View {
     @State private var selectedAIRole: Role?
     @State private var pendingSceneId = UUID()
     @State private var pendingChatNavigation = false
+    @State private var chatStartTime: Date?  // 对话开始时间
 
     // 两阶段加载
     @State private var isExpressionsLoading = false
@@ -73,11 +73,6 @@ struct ResultView: View {
         }
         .task {
             await analyzeImage()
-        }
-        .alert("保存成功", isPresented: $showSaveSuccess) {
-            Button("好的") {
-                dismiss()
-            }
         }
     }
 
@@ -132,10 +127,14 @@ struct ResultView: View {
 
             // Bottom Buttons
             HStack(spacing: 12) {
-                // Save Button
+                // Save Button - 可切换保存/取消保存状态
                 Button {
                     Task {
-                        await saveScene(result)
+                        if isSavedToLibrary {
+                            await unsaveScene()
+                        } else {
+                            await saveScene(result)
+                        }
                     }
                 } label: {
                     HStack {
@@ -143,19 +142,19 @@ struct ResultView: View {
                             ProgressView()
                                 .tint(.white)
                         } else if isSavedToLibrary {
-                            Image(systemName: "checkmark")
+                            Image(systemName: "checkmark.circle.fill")
                         } else {
                             Image(systemName: "square.and.arrow.down")
                         }
-                        Text(isSavedToLibrary ? "已保存" : "保存到场景库")
+                        Text(isSavedToLibrary ? "已保存场景" : "保存场景")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(isSavedToLibrary ? AppTheme.Colors.secondary.opacity(0.5) : AppTheme.Colors.secondary)
+                    .background(isSavedToLibrary ? AppTheme.Colors.secondary : AppTheme.Colors.secondary.opacity(0.7))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .disabled(isSaving || isSavedToLibrary)
+                .disabled(isSaving)
 
                 // AI Chat Button
                 Button {
@@ -211,6 +210,9 @@ struct ResultView: View {
                let userRole = selectedUserRole,
                let aiRole = selectedAIRole {
                 ChatView(sceneContext: result, userRole: userRole, aiRole: aiRole, photoData: image.jpegData(compressionQuality: 0.8), isPresented: $showChat)
+                    .onAppear {
+                        chatStartTime = Date()
+                    }
             } else {
                 Text("加载中...")
                     .onAppear {
@@ -218,6 +220,18 @@ struct ResultView: View {
                             showChat = false
                         }
                     }
+            }
+        }
+        .onChange(of: showChat) { oldValue, newValue in
+            // 对话结束时记录时长和对话次数
+            if oldValue == true && newValue == false {
+                if let startTime = chatStartTime, let scene = currentScene {
+                    let duration = Int(Date().timeIntervalSince(startTime))
+                    scene.addDialogueDuration(duration)
+                    scene.incrementDialogueCount()
+                    try? modelContext.save()
+                    chatStartTime = nil
+                }
             }
         }
     }
@@ -321,7 +335,6 @@ struct ResultView: View {
             do {
                 try modelContext.save()
                 isSavedToLibrary = true
-                showSaveSuccess = true
             } catch {
                 errorMessage = "保存失败：\(error.localizedDescription)"
             }
@@ -347,9 +360,25 @@ struct ResultView: View {
             do {
                 try modelContext.save()
                 isSavedToLibrary = true
-                showSaveSuccess = true
             } catch {
                 errorMessage = "保存失败：\(error.localizedDescription)"
+            }
+        }
+
+        isSaving = false
+    }
+
+    /// 从场景库取消保存
+    private func unsaveScene() async {
+        isSaving = true
+
+        if let scene = currentScene {
+            scene.isSavedToLibrary = false
+            do {
+                try modelContext.save()
+                isSavedToLibrary = false
+            } catch {
+                errorMessage = "取消保存失败：\(error.localizedDescription)"
             }
         }
 
@@ -372,16 +401,16 @@ struct ContentTabSelector: View {
                     }
                 } label: {
                     Text(tabs[index])
-                        .font(.system(size: 12, design: .rounded))
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(selectedTab == index ? .white : Color(red: 0.29, green: 0.33, blue: 0.40))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
                         .background(
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: 16)
                                 .fill(selectedTab == index ? AppTheme.Colors.secondary : .white)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: 16)
                                 .stroke(selectedTab == index ? Color.clear : Color(red: 0.90, green: 0.91, blue: 0.92), lineWidth: 0.5)
                         )
                         .shadow(color: selectedTab == index ? AppTheme.Colors.cardShadow : .clear, radius: 6, y: 4)
@@ -440,13 +469,15 @@ struct VocabularyItem: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(tag.en)
-                    .font(.system(size: 16, weight: .regular, design: .rounded))
-                    .foregroundStyle(AppTheme.Colors.textPrimary)
-                if !tag.phonetic.isEmpty {
-                    Text(tag.phonetic)
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
+                HStack(spacing: 6) {
+                    Text(tag.en)
+                        .font(.system(size: 16, weight: .regular, design: .rounded))
+                        .foregroundStyle(AppTheme.Colors.textPrimary)
+                    if !tag.phonetic.isEmpty {
+                        Text(tag.phonetic)
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                    }
                 }
                 Text(tag.cn)
                     .font(.system(size: 14, design: .rounded))
@@ -530,47 +561,40 @@ struct DescriptionCard: View {
                 Text("场景描述")
                     .font(.system(size: 16, weight: .medium, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textPrimary)
+                    .padding(.horizontal)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("English")
-                            .font(.system(size: 12, design: .rounded))
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(description.en)
+                            .font(.system(size: 16, design: .rounded))
+                            .foregroundStyle(AppTheme.Colors.textPrimary)
+                        Text(description.cn)
+                            .font(.system(size: 14, design: .rounded))
                             .foregroundStyle(AppTheme.Colors.textSecondary)
-                        Spacer()
-                        Button {
-                            speak(text: description.en)
-                        } label: {
-                            Image(systemName: "speaker.wave.2.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(AppTheme.Colors.textSecondary)
-                                .frame(width: 28, height: 28)
-                                .background(.white)
-                                .clipShape(Circle())
-                                .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
-                        }
-                        .disabled(isSpeaking)
                     }
-                    Text(description.en)
-                        .font(.system(size: 14, design: .rounded))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
+
+                    Spacer()
+
+                    Button {
+                        speak(text: description.en)
+                    } label: {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(AppTheme.Colors.textSecondary)
+                            .frame(width: 28, height: 28)
+                            .background(.white)
+                            .clipShape(Circle())
+                            .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
+                    }
+                    .disabled(isSpeaking)
                 }
-                .padding()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
                 .background(Color(red: 1, green: 0.97, blue: 0.93))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("中文")
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundStyle(AppTheme.Colors.textSecondary)
-                    Text(description.cn)
-                        .font(.system(size: 14, design: .rounded))
-                        .foregroundStyle(AppTheme.Colors.textPrimary)
-                }
-                .padding()
-                .background(Color(red: 0.99, green: 0.95, blue: 0.97))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(.horizontal)
             }
-            .padding()
+            .padding(.top)
             .padding(.bottom, 20)
         }
     }
@@ -656,7 +680,7 @@ struct RoleSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(role.roleEn)
+                Text(role.roleEn.replacingOccurrences(of: "_", with: " "))
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textPrimary)
                 Text(role.roleCn)

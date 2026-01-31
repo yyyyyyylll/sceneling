@@ -175,7 +175,7 @@ struct ChatView: View {
                         )
                 }
 
-                Text(sceneContext.sceneTag)
+                Text(sceneContext.sceneTag.replacingOccurrences(of: "_", with: " "))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color(red: 0.10, green: 0.10, blue: 0.10))
                     .padding(.horizontal, 8)
@@ -185,7 +185,7 @@ struct ChatView: View {
                     .padding(10)
             }
 
-            Text("\(aiRole.roleEn) - \(userRole.roleEn)")
+            Text("\(aiRole.roleEn.replacingOccurrences(of: "_", with: " ")) - \(userRole.roleEn.replacingOccurrences(of: "_", with: " "))")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Color(red: 0.38, green: 0.40, blue: 0.45))
                 .frame(maxWidth: .infinity, alignment: .center)

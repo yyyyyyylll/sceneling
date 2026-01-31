@@ -17,6 +17,7 @@ final class LocalScene {
     var createdAt: Date
     var isSynced: Bool
     var dialogueCount: Int = 0  // 对话次数
+    var dialogueDuration: Int = 0  // 对话时长（秒）
     var isSavedToLibrary: Bool = false  // 是否保存到场景库
 
     init(
@@ -34,6 +35,7 @@ final class LocalScene {
         createdAt: Date = Date(),
         isSynced: Bool = false,
         dialogueCount: Int = 0,
+        dialogueDuration: Int = 0,
         isSavedToLibrary: Bool = false
     ) {
         self.id = id
@@ -50,7 +52,13 @@ final class LocalScene {
         self.createdAt = createdAt
         self.isSynced = isSynced
         self.dialogueCount = dialogueCount
+        self.dialogueDuration = dialogueDuration
         self.isSavedToLibrary = isSavedToLibrary
+    }
+
+    /// 增加对话时长（秒）
+    func addDialogueDuration(_ seconds: Int) {
+        dialogueDuration += seconds
     }
 
     /// 增加对话次数

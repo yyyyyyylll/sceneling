@@ -97,7 +97,7 @@ struct RoleSelectionView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text(sceneTag)
+                    Text(sceneTag.replacingOccurrences(of: "_", with: " "))
                         .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundStyle(AppTheme.Colors.textPrimary)
 
@@ -248,7 +248,7 @@ struct RoleCard: View {
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(red: 0.12, green: 0.16, blue: 0.22))
 
-                Text(role.roleEn)
+                Text(role.roleEn.replacingOccurrences(of: "_", with: " "))
                     .font(.system(size: 10, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textSecondary)
             }

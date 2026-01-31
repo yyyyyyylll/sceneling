@@ -43,12 +43,12 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             Text("SceneLing")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundStyle(AppTheme.Colors.textPrimary)
             Text("生活随手拍，地道学英语")
-                .font(.system(size: 12, design: .rounded))
+                .font(.system(size: 15, design: .rounded))
                 .foregroundStyle(AppTheme.Colors.textSecondary)
         }
         .padding(.top, 20)
@@ -67,10 +67,10 @@ struct HomeView: View {
                 // Inner white area
                 VStack(spacing: 6) {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 36))
+                        .font(.system(size: 40))
                         .foregroundStyle(AppTheme.Colors.primary)
                     Text("拍照学习")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundStyle(AppTheme.Colors.primary)
                 }
                 .frame(width: 128, height: 128)
@@ -86,32 +86,32 @@ struct HomeView: View {
 
     private var statsSection: some View {
         HStack(spacing: 10) {
-            statCard(icon: "photo.stack", value: "\(stats.totalScenes)", label: "场景", color: AppTheme.Colors.Pastels.pink)
-            statCard(icon: "bubble.left.and.bubble.right.fill", value: "\(stats.totalDialogues)", label: "对话", color: AppTheme.Colors.Pastels.purple)
-            statCard(icon: "flame.fill", value: "\(stats.learningDays)", label: "连续天", color: AppTheme.Colors.Pastels.blue)
+            statCard(icon: "photo.stack", value: "\(stats.totalScenes)", label: "场景", color: AppTheme.Colors.Pastels.coral)
+            statCard(icon: "bubble.left.and.bubble.right.fill", value: "\(stats.totalDialogues)", label: "对话", color: AppTheme.Colors.Pastels.brown)
+            statCard(icon: "flame.fill", value: "\(stats.learningDays)", label: "连续天", color: AppTheme.Colors.primary200)
         }
     }
 
     private func statCard(icon: String, value: String, label: String, color: Color) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.system(size: 16))
                 .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
+                .frame(width: 28, height: 28)
                 .background(color)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textPrimary)
                 Text(label)
-                    .font(.system(size: 8, weight: .medium, design: .rounded))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textSecondary)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
         .background(AppTheme.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -119,9 +119,9 @@ struct HomeView: View {
     }
 
     private var recentScenesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("最近学习")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.system(size: 22, weight: .medium, design: .rounded))
                 .foregroundStyle(AppTheme.Colors.textPrimary)
 
             // Group scenes by date
@@ -130,13 +130,13 @@ struct HomeView: View {
                     // Date label
                     HStack(spacing: 6) {
                         Text(dateLabel)
-                            .font(.system(size: 10, design: .rounded))
+                            .font(.system(size: 14, design: .rounded))
                             .foregroundStyle(AppTheme.Colors.textSecondary)
                         Text("·")
-                            .font(.system(size: 10, design: .rounded))
+                            .font(.system(size: 14, design: .rounded))
                             .foregroundStyle(AppTheme.Colors.textSecondary)
                         Text("\(scenes.count)个场景")
-                            .font(.system(size: 10, design: .rounded))
+                            .font(.system(size: 14, design: .rounded))
                             .foregroundStyle(AppTheme.Colors.textSecondary)
                     }
 
@@ -192,17 +192,56 @@ struct HomeView: View {
     }
 
     private func loadStats() async {
-        do {
-            stats = try await APIService.shared.getUserStats()
-        } catch {
-            // 使用本地数据计算
-            let dialogueCount = recentScenes.reduce(0) { $0 + $1.expressions.roles.count }
-            stats = UserStats(
-                totalScenes: recentScenes.count,
-                totalDialogues: dialogueCount,
-                learningDays: 1
-            )
+        // 使用本地数据计算统计
+        let totalScenes = recentScenes.count
+        let totalDialogues = recentScenes.reduce(0) { $0 + $1.dialogueCount }
+        let learningDays = calculateConsecutiveDays()
+
+        stats = UserStats(
+            totalScenes: totalScenes,
+            totalDialogues: totalDialogues,
+            learningDays: learningDays
+        )
+    }
+
+    /// 计算连续学习天数
+    private func calculateConsecutiveDays() -> Int {
+        guard !recentScenes.isEmpty else { return 0 }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // 获取所有学习日期（去重）
+        var learningDates = Set<Date>()
+        for scene in recentScenes {
+            let date = calendar.startOfDay(for: scene.createdAt)
+            learningDates.insert(date)
         }
+
+        // 检查今天或昨天是否有学习记录（连续天数的起点）
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+
+        var startDate: Date
+        if learningDates.contains(today) {
+            startDate = today
+        } else if learningDates.contains(yesterday) {
+            startDate = yesterday
+        } else {
+            // 今天和昨天都没有学习，连续天数为0
+            return 0
+        }
+
+        // 从起点往前计算连续天数
+        var consecutiveDays = 0
+        var checkDate = startDate
+
+        while learningDates.contains(checkDate) {
+            consecutiveDays += 1
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
+            checkDate = previousDay
+        }
+
+        return consecutiveDays
     }
 }
 
@@ -210,31 +249,31 @@ struct SceneCard: View {
     let scene: LocalScene
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             if let photoData = scene.photoData,
                let uiImage = UIImage(data: photoData) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 92, height: 92)
+                    .frame(width: 100, height: 100)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             } else {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color(red: 0.50, green: 0.23, blue: 0.27).opacity(0.50))
-                    .frame(width: 92, height: 92)
+                    .frame(width: 100, height: 100)
                     .overlay {
                         Image(systemName: "photo")
                             .foregroundStyle(.white.opacity(0.6))
                     }
             }
 
-            Text(scene.sceneTag)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+            Text(scene.sceneTag.replacingOccurrences(of: "_", with: " "))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(AppTheme.Colors.textPrimary)
                 .lineLimit(1)
         }
         .padding(10)
-        .frame(width: 112)
+        .frame(width: 120)
         .background(AppTheme.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)

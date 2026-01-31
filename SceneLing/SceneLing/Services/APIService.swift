@@ -38,7 +38,7 @@ enum APIEnvironment {
             return "http://127.0.0.1:8000/api"
         case .localDevice:
             // ⚠️ 真机测试时，使用 Cloudflare Tunnel（校园网环境）
-            return "https://pittsburgh-essex-adelaide-const.trycloudflare.com/api"
+            return "https://drink-gerald-society-potter.trycloudflare.com/api"
         case .production:
             // ⚠️ 上线时，改成你的生产服务器地址
             return "https://api.sceneling.com/api"

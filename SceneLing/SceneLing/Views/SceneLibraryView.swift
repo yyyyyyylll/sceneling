@@ -315,7 +315,7 @@ struct SceneLibraryCard: View {
     @State private var selectedUserRole: Role?
     @State private var selectedAIRole: Role?
     @State private var pendingChatNavigation = false
-    @State private var didStartChat = false  // 追踪是否开始了对话
+    @State private var chatStartTime: Date?  // 对话开始时间
 
     private var sceneContext: SceneAnalyzeResponse {
         SceneAnalyzeResponse(
@@ -362,7 +362,7 @@ struct SceneLibraryCard: View {
 
             // Title and chat button
             HStack(spacing: 8) {
-                Text(scene.sceneTag)
+                Text(scene.sceneTag.replacingOccurrences(of: "_", with: " "))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(AppTheme.Colors.textPrimary)
                     .lineLimit(1)
@@ -414,7 +414,7 @@ struct SceneLibraryCard: View {
             if let userRole = selectedUserRole, let aiRole = selectedAIRole {
                 ChatView(sceneContext: sceneContext, userRole: userRole, aiRole: aiRole, photoData: scene.photoData, isPresented: $showChat)
                     .onAppear {
-                        didStartChat = true
+                        chatStartTime = Date()
                     }
             } else {
                 Text("加载中...")
@@ -426,10 +426,14 @@ struct SceneLibraryCard: View {
             }
         }
         .onChange(of: showChat) { oldValue, newValue in
-            // 当对话结束时（showChat从true变为false），增加对话次数
-            if oldValue == true && newValue == false && didStartChat {
-                scene.incrementDialogueCount()
-                didStartChat = false
+            // 对话结束时记录时长和对话次数
+            if oldValue == true && newValue == false {
+                if let startTime = chatStartTime {
+                    let duration = Int(Date().timeIntervalSince(startTime))
+                    scene.addDialogueDuration(duration)
+                    scene.incrementDialogueCount()
+                    chatStartTime = nil
+                }
             }
         }
     }

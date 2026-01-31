@@ -31,14 +31,20 @@ struct ProfileView: View {
 
                 // Stats Section
                 Section("学习统计") {
-                    HStack {
-                        StatRow(icon: "photo.stack", title: "场景数", value: "\(scenes.count)")
-                        Divider()
-                        StatRow(icon: "textformat.abc", title: "词汇数", value: "\(vocabularyCount)")
-                        Divider()
-                        StatRow(icon: "calendar", title: "学习天数", value: "\(learningDays)")
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ], spacing: 10) {
+                        StatCard(icon: "photo.stack", title: "场景数", value: "\(scenes.count)", color: AppTheme.Colors.Pastels.coral)
+                        StatCard(icon: "textformat.abc", title: "词汇数", value: "\(vocabularyCount)", color: AppTheme.Colors.Pastels.brown)
+                        StatCard(icon: "calendar", title: "学习天数", value: "\(learningDays)", color: AppTheme.Colors.primary200)
+                        StatCard(icon: "note.text", title: "笔记数", value: "\(notes.count)", color: AppTheme.Colors.accent)
+                        StatCard(icon: "bubble.left.and.bubble.right", title: "对话数", value: "\(totalDialogueCount)", color: AppTheme.Colors.secondary)
+                        StatCard(icon: "clock", title: "对话时长", value: "\(totalDialogueDurationMinutes)min", color: Color(red: 0.32, green: 0.64, blue: 1))
                     }
-                    .padding(.vertical, 8)
+                    .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
+                    .listRowBackground(Color.clear)
                 }
 
                 // Features Section
@@ -101,24 +107,45 @@ struct ProfileView: View {
         let dates = Set(scenes.map { Calendar.current.startOfDay(for: $0.createdAt) })
         return dates.count
     }
+
+    private var totalDialogueCount: Int {
+        scenes.reduce(0) { $0 + $1.dialogueCount }
+    }
+
+    private var totalDialogueDurationMinutes: Int {
+        let totalSeconds = scenes.reduce(0) { $0 + $1.dialogueDuration }
+        return totalSeconds / 60
+    }
 }
 
-struct StatRow: View {
+struct StatCard: View {
     let icon: String
     let title: String
     let value: String
+    let color: Color
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             Image(systemName: icon)
-                .foregroundStyle(.blue)
+                .font(.system(size: 16))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(color)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
             Text(value)
-                .font(.headline)
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundStyle(AppTheme.Colors.textPrimary)
+
             Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, design: .rounded))
+                .foregroundStyle(AppTheme.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(AppTheme.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: AppTheme.Colors.cardShadow, radius: 2, y: 1)
     }
 }
 
